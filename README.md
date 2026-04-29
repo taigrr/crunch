@@ -1,12 +1,39 @@
-# crunch
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/taigrr/crunch/raw/master/docs/crunch-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/taigrr/crunch/raw/master/docs/crunch-light.svg">
+  <img alt="crunch" src="https://github.com/taigrr/crunch/raw/master/docs/crunch-dark.svg" width="400">
+</picture>
 
-Summarize daily AI coding assistant activity from Crush databases.
+**Crunch your daily AI coding activity into a summary.**
 
-## Overview
+## The Problem
 
-`crunch` scans your filesystem for `crush.db` files (SQLite databases created by the [Crush](https://github.com/charmcli/crush) AI coding assistant), extracts user prompts for a specified date, and generates a summary using AWS Bedrock.
+You use [Crush](https://github.com/charmcli/crush) all day, every day.
+At the end of the week, you need to write status updates, fill out timesheets, or just remember what you worked on.
+But the context is scattered across dozens of project directories in `crush.db` files.
 
-## Installation
+## The Solution
+
+**Crunch** scans your filesystem for `crush.db` files, extracts your prompts for a given date, and generates a structured summary using your preferred LLM.
+
+```bash
+# What did I work on today?
+crunch
+
+# What about last Tuesday?
+crunch -d 2026-04-22
+```
+
+## ✨ Features
+
+- 🔍 **Automatic discovery** — Recursively finds all `crush.db` files
+- 📅 **Date filtering** — Summarize any day's activity
+- 🏷️ **Project grouping** — Messages organized by inferred project
+- 🌊 **Streaming output** — Real-time progress with cost estimation
+- 🔌 **Multi-provider** — AWS Bedrock, Anthropic, OpenAI, OpenRouter
+- ⚡ **Fast scanning** — Skips `node_modules`, `.git`, `vendor`, etc.
+
+## 📦 Installation
 
 ```bash
 go install github.com/taigrr/crunch@latest
@@ -17,47 +44,105 @@ Or build from source:
 ```bash
 git clone https://github.com/taigrr/crunch
 cd crunch
-go build -o crunch .
+go build
 ```
 
-## Usage
+## ⚡ Requirements
+
+- Go >= **1.21** (for installation)
+- One of:
+  - AWS credentials (for Bedrock)
+  - `ANTHROPIC_API_KEY`
+  - `OPENAI_API_KEY`
+  - `OPENROUTER_API_KEY`
+
+## 🚀 Quick Start
 
 ```bash
-# Summarize activity for a specific date
-crunch -date 2026-04-28
+# Summarize today's activity (auto-detects provider from env)
+crunch
 
-# Search a specific directory (default: home directory)
-crunch -date 2026-04-28 -path ~/code
+# Summarize a specific date
+crunch -d 2026-04-28
 
-# Verbose output (shows skipped directories and found databases)
-crunch -date 2026-04-28 -v
+# Search only in a specific directory
+crunch -p ~/code
+
+# Use a specific provider
+crunch --provider anthropic
+
+# Use a specific model
+crunch --provider openrouter -m anthropic/claude-sonnet-4
 ```
 
-## Requirements
+## 📖 Flags
 
-- AWS credentials configured (via environment variables, `~/.aws/credentials`, or IAM role)
-- Access to AWS Bedrock with Claude Sonnet 4 enabled
-- Go 1.21+ for building
+| Flag         | Short | Description                                           |
+| ------------ | ----- | ----------------------------------------------------- |
+| `--date`     | `-d`  | Date to summarize (YYYY-MM-DD, default: today)        |
+| `--path`     | `-p`  | Path to search (default: home directory)              |
+| `--dir`      |       | Base directory to strip from project paths            |
+| `--provider` |       | LLM provider (bedrock, anthropic, openai, openrouter) |
+| `--model`    | `-m`  | Model to use (provider-specific)                      |
+| `--api-key`  |       | API key (overrides env variable)                      |
+| `--verbose`  | `-v`  | Verbose output                                        |
+| `--help`     | `-h`  | Show help                                             |
 
-## How It Works
+## 🔌 Providers
 
-1. Walks the filesystem from the specified path (default: home directory)
-2. Skips common dependency directories (node_modules, vendor, .git, etc.)
-3. Finds all `crush.db` SQLite files
-4. Extracts user messages for the target date
-5. Groups messages by project (inferred from file path)
-6. Sends to Claude via AWS Bedrock for summarization
-7. Outputs a structured summary suitable for daily journal entries
+| Provider     | Env Variable         | Default Model                                |
+| ------------ | -------------------- | -------------------------------------------- |
+| `bedrock`    | AWS credentials      | `us.anthropic.claude-sonnet-4-20250514-v1:0` |
+| `anthropic`  | `ANTHROPIC_API_KEY`  | `claude-sonnet-4-20250514`                   |
+| `openai`     | `OPENAI_API_KEY`     | `gpt-4o`                                     |
+| `openrouter` | `OPENROUTER_API_KEY` | `anthropic/claude-sonnet-4`                  |
 
-## Output Format
+Provider is auto-detected from environment variables. If multiple are set, priority is: Anthropic > OpenAI > OpenRouter > Bedrock.
 
-The output is formatted as a daily development summary with:
+## ⚙️ Environment Variables
+
+```bash
+# Provider-specific API keys
+export ANTHROPIC_API_KEY="sk-ant-..."
+export OPENAI_API_KEY="sk-..."
+export OPENROUTER_API_KEY="sk-or-..."
+
+# Override defaults with CRUNCH_ prefix
+export CRUNCH_PROVIDER="anthropic"
+export CRUNCH_MODEL="claude-sonnet-4-20250514"
+export CRUNCH_API_KEY="sk-ant-..."
+```
+
+## 🔧 How It Works
+
+1. **Scan** — Walks your filesystem looking for `crush.db` files
+2. **Skip** — Ignores common dependency directories (node_modules, vendor, .git, etc.)
+3. **Extract** — Reads user messages from SQLite for the target date
+4. **Group** — Organizes messages by project (inferred from file path)
+5. **Summarize** — Sends grouped prompts to your LLM with streaming output
+6. **Display** — Shows real-time progress with token/cost estimation
+
+## 📋 Output
+
+The summary is structured for easy scanning:
 
 - Project-by-project breakdown
 - Key tasks and accomplishments
 - Technologies used
-- Notable patterns observed
+- Notable patterns (debugging, feature work, refactoring)
 
-## License
+Perfect for:
 
-MIT
+- Daily standups
+- Weekly status reports
+- Timesheet entries
+- Personal dev journals
+
+## 🤝 Related Projects
+
+- [Crush](https://github.com/charmcli/crush) — The AI coding assistant that creates the databases
+- [Fantasy](https://github.com/charmbracelet/fantasy) — The multi-provider LLM library powering crunch
+
+## 📄 License
+
+[0BSD](LICENSE) © [Tai Groot](https://github.com/taigrr)

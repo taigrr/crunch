@@ -2,382 +2,403 @@ package main
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
-	"flag"
 	"fmt"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/fang"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra"
+	"github.com/taigrr/crunch/internal/db"
+	"github.com/taigrr/crunch/internal/llm"
+	"github.com/taigrr/crunch/internal/scanner"
+	"github.com/taigrr/crunch/internal/summarizer"
 )
 
-var skipDirs = map[string]bool{
-	"node_modules":     true,
-	".git":             true,
-	"vendor":           true,
-	".venv":            true,
-	"venv":             true,
-	"__pycache__":      true,
-	".cache":           true,
-	".npm":             true,
-	".pnpm":            true,
-	"dist":             true,
-	"build":            true,
-	".next":            true,
-	".nuxt":            true,
-	"target":           true,
-	"pkg":              true,
-	".cargo":           true,
-	".rustup":          true,
-	"Library":          true,
-	"Applications":     true,
-	".Trash":           true,
-	"Movies":           true,
-	"Music":            true,
-	"Pictures":         true,
-	".local":           true,
-	".gradle":          true,
-	".m2":              true,
-	".cocoapods":       true,
-	"Pods":             true,
-	".pub-cache":       true,
-	".dartServer":      true,
-	".docker":          true,
-	".orbstack":        true,
-	"go":               true, // ~/go typically has pkg/mod
-	".ollama":          true,
-	".android":         true,
-	".gem":             true,
-	".bundle":          true,
-	".terraform":       true,
-	".stack":           true,
-	".cabal":           true,
-	".ghcup":           true,
-	".pyenv":           true,
-	".rbenv":           true,
-	".nvm":             true,
-	".volta":           true,
-	".sdkman":          true,
-	".asdf":            true,
-	".mix":             true,
-	".hex":             true,
-	"_build":           true,
-	"deps":             true,
-	"elm-stuff":        true,
-	"bower_components": true,
-	".bun":             true,
-	".antigravity":     true,
-	".vscode":          true,
-	".zed":             true,
-	".config":          true,
-	"Downloads":        true,
-	"Documents":        true,
-	"Desktop":          true,
-	".Spotlight-V100":  true,
-	".fseventsd":       true,
-}
-
-type MessagePart struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
-type TextData struct {
-	Text string `json:"text"`
-}
-
-type UserMessage struct {
-	Timestamp time.Time
-	Text      string
-	DBPath    string
-}
+var (
+	dateStr     string
+	searchPath  string
+	baseDir     string
+	verbose     bool
+	providerStr string
+	modelStr    string
+	apiKey      string
+)
 
 func main() {
-	dateStr := flag.String("date", "", "Date to summarize (YYYY-MM-DD)")
-	searchPath := flag.String("path", "", "Path to search (default: home directory)")
-	verbose := flag.Bool("v", false, "Verbose output")
-	flag.Parse()
+	cmd := &cobra.Command{
+		Use:   "crunch",
+		Short: "Summarize daily AI coding assistant activity",
+		Long:  "Scans for crush.db files and generates a summary of your daily coding activity.",
+		RunE:  run,
+	}
 
-	if *dateStr == "" {
-		fmt.Fprintln(os.Stderr, "Usage: crunch -date YYYY-MM-DD [-path /search/path] [-v]")
+	cmd.Flags().StringVarP(&dateStr, "date", "d", "", "Date to summarize (YYYY-MM-DD, default: today)")
+	cmd.Flags().StringVarP(&searchPath, "path", "p", "", "Path to search (default: home directory)")
+	cmd.Flags().StringVar(&baseDir, "dir", "", "Base directory to strip from project paths")
+	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+	cmd.Flags().StringVar(&providerStr, "provider", "", "LLM provider (bedrock, anthropic, openai, openrouter)")
+	cmd.Flags().StringVarP(&modelStr, "model", "m", "", "Model to use (provider-specific)")
+	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key (or use env: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)")
+
+	if err := fang.Execute(context.Background(), cmd); err != nil {
 		os.Exit(1)
 	}
-
-	targetDate, err := time.ParseInLocation("2006-01-02", *dateStr, time.Local)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid date format: %v\n", err)
-		os.Exit(1)
-	}
-
-	root := *searchPath
-	if root == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Cannot get home directory: %v\n", err)
-			os.Exit(1)
-		}
-		root = home
-	}
-
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "Searching for crush.db files in %s...\n", root)
-	}
-
-	dbFiles := findCrushDBs(root, *verbose)
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "Found %d crush.db files\n", len(dbFiles))
-	}
-
-	messages := collectMessages(dbFiles, targetDate, *verbose)
-	if len(messages) == 0 {
-		fmt.Printf("No user messages found for %s\n", *dateStr)
-		return
-	}
-
-	if *verbose {
-		fmt.Fprintf(os.Stderr, "Found %d user messages, summarizing...\n", len(messages))
-	}
-
-	summary, err := summarizeWithBedrock(messages, targetDate)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error summarizing: %v\n", err)
-		os.Exit(1)
-	}
-
-	fmt.Println(summary)
 }
 
-func findCrushDBs(root string, verbose bool) []string {
-	var dbFiles []string
+type phase int
 
-	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil // Skip inaccessible paths
+const (
+	phaseScanning phase = iota
+	phaseCollecting
+	phaseInitializing
+	phaseSummarizing
+	phaseDone
+)
+
+type model struct {
+	spinner      spinner.Model
+	phase        phase
+	err          error
+	summary      string
+	targetDate   time.Time
+	dbFiles      []string
+	messages     []db.UserMessage
+	client       *llm.Client
+	scanCount    int
+	dbProcessed  int
+	dbTotal      int
+	msgCount     int
+	streaming    bool
+	streamChars  int
+	inputTokens  int64
+	outputTokens int64
+	finalCost    float64
+	provider     llm.Provider
+	progressCh   chan tea.Msg
+}
+
+type scanProgressMsg struct {
+	count int
+}
+
+type scanDoneMsg struct {
+	dbFiles []string
+	err     error
+}
+
+type collectProgressMsg struct {
+	processed int
+	total     int
+}
+
+type collectDoneMsg struct {
+	messages []db.UserMessage
+	err      error
+}
+
+type clientReadyMsg struct {
+	client *llm.Client
+	err    error
+}
+
+type streamProgressMsg struct {
+	chars        int
+	inputTokens  int64
+	outputTokens int64
+}
+
+type streamFinishMsg struct {
+	usage llm.Usage
+}
+
+type summaryDoneMsg struct {
+	summary string
+	err     error
+}
+
+var (
+	spinnerStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	countStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
+)
+
+func initialModel(targetDate time.Time, provider llm.Provider) model {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = spinnerStyle
+	return model{
+		spinner:    s,
+		phase:      phaseScanning,
+		targetDate: targetDate,
+		provider:   provider,
+		progressCh: make(chan tea.Msg, 100),
+	}
+}
+
+func (m model) Init() tea.Cmd {
+	return tea.Batch(m.spinner.Tick, m.scanCmd(), m.listenProgress())
+}
+
+func (m model) scanCmd() tea.Cmd {
+	return func() tea.Msg {
+		root := searchPath
+		if root == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return scanDoneMsg{err: err}
+			}
+			root = home
 		}
 
-		if d.IsDir() {
-			base := filepath.Base(path)
-			if skipDirs[base] {
+		var count int
+		opts := &scanner.Options{
+			OnFound: func(path string) {
+				count++
+				m.progressCh <- scanProgressMsg{count: count}
 				if verbose {
-					fmt.Fprintf(os.Stderr, "Skipping: %s\n", path)
+					fmt.Fprintf(os.Stderr, "Found: %s\n", path)
 				}
-				return filepath.SkipDir
-			}
-			return nil
+			},
 		}
 
-		if d.Name() == "crush.db" {
-			dbFiles = append(dbFiles, path)
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Found: %s\n", path)
-			}
-		}
-		return nil
-	})
-
-	if err != nil && verbose {
-		fmt.Fprintf(os.Stderr, "Walk error: %v\n", err)
+		dbFiles, err := scanner.FindCrushDBs(root, opts)
+		return scanDoneMsg{dbFiles: dbFiles, err: err}
 	}
-
-	return dbFiles
 }
 
-func collectMessages(dbFiles []string, targetDate time.Time, verbose bool) []UserMessage {
-	var messages []UserMessage
-
-	startOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, time.Local)
-	endOfDay := startOfDay.Add(24 * time.Hour)
-
-	startUnix := startOfDay.Unix()
-	endUnix := endOfDay.Unix()
-
-	for _, dbPath := range dbFiles {
-		db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
-		if err != nil {
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Cannot open %s: %v\n", dbPath, err)
-			}
-			continue
+func (m model) collectCmd() tea.Cmd {
+	return func() tea.Msg {
+		opts := &db.CollectOptions{
+			BaseDir: baseDir,
+			OnProgress: func(processed, total int) {
+				m.progressCh <- collectProgressMsg{processed: processed, total: total}
+			},
 		}
+		messages, err := db.CollectMessages(m.dbFiles, m.targetDate, opts)
+		return collectDoneMsg{messages: messages, err: err}
+	}
+}
 
-		query := `
-			SELECT created_at, parts 
-			FROM messages 
-			WHERE role = 'user' 
-			  AND created_at >= ? 
-			  AND created_at < ?
-			ORDER BY created_at ASC
-		`
+func (m model) listenProgress() tea.Cmd {
+	return func() tea.Msg {
+		return <-m.progressCh
+	}
+}
 
-		rows, err := db.Query(query, startUnix, endUnix)
-		if err != nil {
-			db.Close()
-			if verbose {
-				fmt.Fprintf(os.Stderr, "Query error on %s: %v\n", dbPath, err)
-			}
-			continue
+func (m model) initClientCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		opts := &llm.Options{
+			Provider: m.provider,
+			Model:    modelStr,
+			APIKey:   apiKey,
 		}
+		client, err := llm.NewClient(ctx, opts)
+		return clientReadyMsg{client: client, err: err}
+	}
+}
 
-		for rows.Next() {
-			var createdAt int64
-			var partsJSON string
+func (m model) summarizeStreamCmd() tea.Cmd {
+	return func() tea.Msg {
+		ctx := context.Background()
+		prompt := summarizer.BuildPrompt(m.messages, m.targetDate)
 
-			if err := rows.Scan(&createdAt, &partsJSON); err != nil {
-				continue
-			}
+		// Estimate input tokens from prompt length (~4 chars per token)
+		inputTokens := int64(len(prompt) / 4)
 
-			var parts []MessagePart
-			if err := json.Unmarshal([]byte(partsJSON), &parts); err != nil {
-				continue
-			}
-
-			var textContent strings.Builder
-			for _, part := range parts {
-				if part.Type == "text" {
-					var textData TextData
-					if err := json.Unmarshal(part.Data, &textData); err == nil {
-						textContent.WriteString(textData.Text)
-						textContent.WriteString("\n")
-					}
+		var totalChars int
+		summary, err := m.client.InvokeStream(ctx, llm.StreamCall{
+			Prompt: prompt,
+			OnTextDelta: func(text string) error {
+				totalChars += len(text)
+				// Estimate output tokens from chars (~4 chars per token)
+				outputTokens := int64(totalChars / 4)
+				m.progressCh <- streamProgressMsg{
+					chars:        totalChars,
+					inputTokens:  inputTokens,
+					outputTokens: outputTokens,
 				}
-			}
+				return nil
+			},
+			OnStreamFinish: func(usage llm.Usage) error {
+				m.progressCh <- streamFinishMsg{usage: usage}
+				return nil
+			},
+		})
+		return summaryDoneMsg{summary: summary, err: err}
+	}
+}
 
-			text := strings.TrimSpace(textContent.String())
-			if text != "" {
-				messages = append(messages, UserMessage{
-					Timestamp: time.Unix(createdAt, 0),
-					Text:      text,
-					DBPath:    dbPath,
-				})
-			}
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" || msg.String() == "q" {
+			return m, tea.Quit
 		}
-		rows.Close()
-		db.Close()
+
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
+
+	case scanProgressMsg:
+		m.scanCount = msg.count
+		return m, m.listenProgress()
+
+	case scanDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.phase = phaseDone
+			return m, tea.Quit
+		}
+		m.dbFiles = msg.dbFiles
+		m.dbTotal = len(msg.dbFiles)
+		m.phase = phaseCollecting
+		return m, tea.Batch(m.collectCmd(), m.listenProgress())
+
+	case collectProgressMsg:
+		m.dbProcessed = msg.processed
+		m.dbTotal = msg.total
+		return m, m.listenProgress()
+
+	case collectDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.phase = phaseDone
+			return m, tea.Quit
+		}
+		m.messages = msg.messages
+		m.msgCount = len(msg.messages)
+		if m.msgCount == 0 {
+			m.summary = fmt.Sprintf("No user messages found for %s", m.targetDate.Format("2006-01-02"))
+			m.phase = phaseDone
+			return m, tea.Quit
+		}
+		m.phase = phaseInitializing
+		return m, m.initClientCmd()
+
+	case clientReadyMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.phase = phaseDone
+			return m, tea.Quit
+		}
+		m.client = msg.client
+		m.phase = phaseSummarizing
+		m.streaming = true
+		return m, tea.Batch(m.summarizeStreamCmd(), m.listenProgress())
+
+	case streamProgressMsg:
+		m.streamChars = msg.chars
+		m.inputTokens = msg.inputTokens
+		m.outputTokens = msg.outputTokens
+		return m, m.listenProgress()
+
+	case streamFinishMsg:
+		// Update with actual token counts and cost from API
+		m.inputTokens = msg.usage.InputTokens
+		m.outputTokens = msg.usage.OutputTokens
+		m.finalCost = msg.usage.Cost
+		return m, m.listenProgress()
+
+	case summaryDoneMsg:
+		if msg.err != nil {
+			m.err = msg.err
+			m.phase = phaseDone
+			return m, tea.Quit
+		}
+		m.summary = msg.summary
+		m.phase = phaseDone
+		return m, tea.Quit
 	}
 
-	return messages
+	return m, nil
 }
 
-func summarizeWithBedrock(messages []UserMessage, targetDate time.Time) (string, error) {
-	ctx := context.Background()
-
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return "", fmt.Errorf("loading AWS config: %w", err)
+func (m model) View() string {
+	if m.phase == phaseDone {
+		if m.err != nil {
+			return fmt.Sprintf("Error: %v\n", m.err)
+		}
+		return m.summary + "\n"
 	}
 
-	client := bedrockruntime.New(bedrockruntime.Options{
-		Region:      cfg.Region,
-		Credentials: cfg.Credentials,
-	})
-
-	var promptBuilder strings.Builder
-	promptBuilder.WriteString(fmt.Sprintf("You are summarizing a developer's work activities for %s.\n\n", targetDate.Format("Monday, January 2, 2006")))
-	promptBuilder.WriteString("Below are all the prompts/requests the user made to their AI coding assistant throughout the day, grouped by project (inferred from the database path).\n\n")
-	promptBuilder.WriteString("Summarize what the user worked on, organized by project or theme. Focus on:\n")
-	promptBuilder.WriteString("- Main projects/repos touched\n")
-	promptBuilder.WriteString("- Key tasks accomplished or attempted\n")
-	promptBuilder.WriteString("- Technologies or tools used\n")
-	promptBuilder.WriteString("- Any notable patterns (debugging, feature work, refactoring, etc.)\n\n")
-	promptBuilder.WriteString("Keep the summary concise but informative, suitable for a daily journal entry. Use bullet points.\n\n")
-	promptBuilder.WriteString("---\n\n")
-
-	// Group messages by project (extract from path)
-	projectMessages := make(map[string][]UserMessage)
-	for _, msg := range messages {
-		project := extractProject(msg.DBPath)
-		projectMessages[project] = append(projectMessages[project], msg)
-	}
-
-	for project, msgs := range projectMessages {
-		promptBuilder.WriteString(fmt.Sprintf("## Project: %s\n\n", project))
-		for _, msg := range msgs {
-			promptBuilder.WriteString(fmt.Sprintf("[%s] %s\n\n", msg.Timestamp.Format("15:04"), truncateText(msg.Text, 500)))
+	var status string
+	switch m.phase {
+	case phaseScanning:
+		if m.scanCount == 0 {
+			status = "Scanning for crush.db files..."
+		} else {
+			status = fmt.Sprintf("Scanning... %s found",
+				countStyle.Render(fmt.Sprintf("%d", m.scanCount)))
+		}
+	case phaseCollecting:
+		status = fmt.Sprintf("Collecting messages %s",
+			countStyle.Render(fmt.Sprintf("[%d/%d]", m.dbProcessed, m.dbTotal)))
+	case phaseInitializing:
+		status = fmt.Sprintf("Found %s messages, initializing %s...",
+			countStyle.Render(fmt.Sprintf("%d", m.msgCount)),
+			dimStyle.Render(string(m.provider)))
+	case phaseSummarizing:
+		if m.streamChars > 0 {
+			var cost float64
+			if m.finalCost > 0 {
+				// Use actual cost from API
+				cost = m.finalCost
+			} else if m.client != nil {
+				// Estimate cost from token counts
+				cost = m.client.CalculateCost(m.inputTokens, m.outputTokens)
+			}
+			costStr := ""
+			if cost > 0 {
+				costStr = fmt.Sprintf(" ~$%.4f", cost)
+			}
+			status = fmt.Sprintf("Generating summary %s%s",
+				countStyle.Render(fmt.Sprintf("[%d chars]", m.streamChars)),
+				dimStyle.Render(costStr))
+		} else {
+			status = fmt.Sprintf("Generating summary %s",
+				dimStyle.Render(fmt.Sprintf("[%d messages]", m.msgCount)))
 		}
 	}
 
-	prompt := promptBuilder.String()
+	return fmt.Sprintf("%s %s\n", m.spinner.View(), status)
+}
 
-	// Truncate if too long
-	if len(prompt) > 180000 {
-		prompt = prompt[:180000] + "\n\n[...truncated due to length...]"
+func run(cmd *cobra.Command, args []string) error {
+	var targetDate time.Time
+	var err error
+
+	if dateStr == "" {
+		targetDate = time.Now()
+	} else {
+		targetDate, err = time.ParseInLocation("2006-01-02", dateStr, time.Local)
+		if err != nil {
+			return fmt.Errorf("invalid date format: %w", err)
+		}
 	}
 
-	requestBody := map[string]any{
-		"anthropic_version": "bedrock-2023-05-31",
-		"max_tokens":        2048,
-		"messages": []map[string]string{
-			{"role": "user", "content": prompt},
-		},
+	var provider llm.Provider
+	if providerStr != "" {
+		provider, err = llm.ParseProvider(providerStr)
+		if err != nil {
+			return err
+		}
 	}
 
-	bodyBytes, err := json.Marshal(requestBody)
+	p := tea.NewProgram(initialModel(targetDate, provider))
+	finalModel, err := p.Run()
 	if err != nil {
-		return "", fmt.Errorf("marshaling request: %w", err)
+		return err
 	}
 
-	output, err := client.InvokeModel(ctx, &bedrockruntime.InvokeModelInput{
-		ModelId:     strPtr("us.anthropic.claude-sonnet-4-20250514-v1:0"),
-		ContentType: strPtr("application/json"),
-		Accept:      strPtr("application/json"),
-		Body:        bodyBytes,
-	})
-	if err != nil {
-		return "", fmt.Errorf("invoking model: %w", err)
+	m := finalModel.(model)
+	if m.err != nil {
+		return m.err
 	}
 
-	var response struct {
-		Content []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"content"`
-	}
-
-	if err := json.Unmarshal(output.Body, &response); err != nil {
-		return "", fmt.Errorf("parsing response: %w", err)
-	}
-
-	if len(response.Content) == 0 {
-		return "", fmt.Errorf("empty response from model")
-	}
-
-	return response.Content[0].Text, nil
-}
-
-func extractProject(dbPath string) string {
-	// Extract meaningful project name from path
-	// e.g., /Users/tai/code/foss/crunch/.crush/crush.db -> foss/crunch
-	// e.g., /Users/tai/code/contracting/mck/code/.crush/crush.db -> contracting/mck/code
-
-	dir := filepath.Dir(dbPath) // Remove crush.db
-	dir = filepath.Dir(dir)     // Remove .crush
-
-	home, _ := os.UserHomeDir()
-	dir = strings.TrimPrefix(dir, home+"/")
-	dir = strings.TrimPrefix(dir, "code/")
-
-	// Limit depth
-	parts := strings.Split(dir, "/")
-	if len(parts) > 3 {
-		parts = parts[:3]
-	}
-
-	return strings.Join(parts, "/")
-}
-
-func truncateText(text string, maxLen int) string {
-	if len(text) <= maxLen {
-		return text
-	}
-	return text[:maxLen] + "..."
-}
-
-func strPtr(s string) *string {
-	return &s
+	return nil
 }

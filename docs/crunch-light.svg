@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="400" height="100" viewBox="0 0 400 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gradient-light" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5a40e6"/>
+      <stop offset="100%" stop-color="#e85a95"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Pixel heart with bite taken out (crunched) -->
+  <g transform="translate(20, 15)">
+    <!-- Main heart shape -->
+    <rect x="8" y="0" width="8" height="8" fill="#ff6daa"/>
+    <rect x="16" y="0" width="8" height="8" fill="#ff6daa"/>
+    <rect x="32" y="0" width="8" height="8" fill="#ff6daa"/>
+    <rect x="40" y="0" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="0" y="8" width="8" height="8" fill="#ff6daa"/>
+    <rect x="8" y="8" width="8" height="8" fill="#ff388b"/>
+    <rect x="16" y="8" width="8" height="8" fill="#ff388b"/>
+    <rect x="24" y="8" width="8" height="8" fill="#ff6daa"/>
+    <rect x="32" y="8" width="8" height="8" fill="#ff388b"/>
+    <rect x="40" y="8" width="8" height="8" fill="#ff388b"/>
+    <rect x="48" y="8" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="0" y="16" width="8" height="8" fill="#ff6daa"/>
+    <rect x="8" y="16" width="8" height="8" fill="#ff388b"/>
+    <rect x="16" y="16" width="8" height="8" fill="#ff13a9"/>
+    <rect x="24" y="16" width="8" height="8" fill="#ff388b"/>
+    <rect x="32" y="16" width="8" height="8" fill="#ff13a9"/>
+    <rect x="40" y="16" width="8" height="8" fill="#ff388b"/>
+    <rect x="48" y="16" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="0" y="24" width="8" height="8" fill="#ff6daa"/>
+    <rect x="8" y="24" width="8" height="8" fill="#ff388b"/>
+    <rect x="16" y="24" width="8" height="8" fill="#ff388b"/>
+    <rect x="24" y="24" width="8" height="8" fill="#ff13a9"/>
+    <rect x="32" y="24" width="8" height="8" fill="#ff388b"/>
+    <rect x="40" y="24" width="8" height="8" fill="#ff388b"/>
+    <rect x="48" y="24" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="8" y="32" width="8" height="8" fill="#ff6daa"/>
+    <rect x="16" y="32" width="8" height="8" fill="#ff388b"/>
+    <rect x="24" y="32" width="8" height="8" fill="#ff388b"/>
+    <rect x="32" y="32" width="8" height="8" fill="#ff388b"/>
+    <rect x="40" y="32" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="16" y="40" width="8" height="8" fill="#ff6daa"/>
+    <rect x="24" y="40" width="8" height="8" fill="#ff388b"/>
+    <rect x="32" y="40" width="8" height="8" fill="#ff6daa"/>
+    
+    <rect x="24" y="48" width="8" height="8" fill="#ff6daa"/>
+    
+    <!-- Bite marks (crunched out) - jagged pixels removed from top right -->
+    <rect x="40" y="0" width="8" height="8" fill="#ffffff"/>
+    <rect x="48" y="0" width="8" height="8" fill="#ffffff"/>
+    <rect x="48" y="8" width="8" height="8" fill="#ffffff"/>
+    
+    <!-- Crumbs falling -->
+    <rect x="54" y="4" width="4" height="4" fill="#ff6daa" opacity="0.8"/>
+    <rect x="60" y="10" width="3" height="3" fill="#ff388b" opacity="0.6"/>
+    <rect x="56" y="16" width="3" height="3" fill="#ff6daa" opacity="0.5"/>
+  </g>
+  
+  <!-- Text "crunch" -->
+  <text x="95" y="62" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace" font-size="48" font-weight="bold" fill="url(#gradient-light)">crunch</text>
+  
+  <!-- Tagline -->
+  <text x="95" y="82" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" fill="#666666">summarize your crush activity</text>
+</svg>
