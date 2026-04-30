@@ -138,6 +138,12 @@ func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string) ([]U
 // ExtractProject derives a project name from a crush.db path.
 // If baseDir is provided, it will be stripped from the path instead of the default prefixes.
 func ExtractProject(dbPath string, baseDir string) string {
+	home, _ := os.UserHomeDir()
+	return extractProjectWithHome(dbPath, baseDir, home)
+}
+
+// extractProjectWithHome is the testable implementation of ExtractProject.
+func extractProjectWithHome(dbPath string, baseDir string, home string) string {
 	dir := filepath.Dir(dbPath)
 	dir = filepath.Dir(dir)
 
@@ -145,7 +151,6 @@ func ExtractProject(dbPath string, baseDir string) string {
 		baseDir = strings.TrimSuffix(baseDir, "/")
 		dir = strings.TrimPrefix(dir, baseDir+"/")
 	} else {
-		home, _ := os.UserHomeDir()
 		dir = strings.TrimPrefix(dir, home+"/")
 		dir = strings.TrimPrefix(dir, "code/")
 	}
