@@ -91,7 +91,11 @@ func NewClient(ctx context.Context, opts *Options) (*Client, error) {
 		}
 	}
 	if provider == "" {
-		provider = detectProvider()
+		var err error
+		provider, err = detectProvider()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	model := opts.Model
@@ -226,22 +230,49 @@ func (c *Client) GetModel() string {
 	return c.model
 }
 
-func detectProvider() Provider {
+// ErrNoCredentials is returned when no LLM provider credentials are found.
+var ErrNoCredentials = fmt.Errorf("no LLM provider credentials found; set one of: CRUNCH_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, or AWS credentials for Bedrock (AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY or AWS_PROFILE)")
+
+func detectProvider() (Provider, error) {
 	if jety.GetString("api_key") != "" {
 		// If CRUNCH_API_KEY is set but no provider, default to anthropic
-		return ProviderAnthropic
+		return ProviderAnthropic, nil
 	}
 	if jety.IsSet("ANTHROPIC_API_KEY") {
-		return ProviderAnthropic
+		return ProviderAnthropic, nil
 	}
 	if jety.IsSet("OPENAI_API_KEY") {
-		return ProviderOpenAI
+		return ProviderOpenAI, nil
 	}
 	if jety.IsSet("OPENROUTER_API_KEY") {
-		return ProviderOpenRouter
+		return ProviderOpenRouter, nil
 	}
-	// Default to bedrock (uses AWS credentials)
-	return ProviderBedrock
+	// Check for AWS credentials before defaulting to Bedrock
+	if hasAWSCredentials() {
+		return ProviderBedrock, nil
+	}
+	return "", ErrNoCredentials
+}
+
+// hasAWSCredentials checks if AWS credentials are available via environment variables or profile.
+func hasAWSCredentials() bool {
+	// Check for explicit credentials
+	if jety.IsSet("AWS_ACCESS_KEY_ID") && jety.IsSet("AWS_SECRET_ACCESS_KEY") {
+		return true
+	}
+	// Check for profile-based credentials
+	if jety.IsSet("AWS_PROFILE") {
+		return true
+	}
+	// Check for SSO session
+	if jety.IsSet("AWS_SSO_SESSION") {
+		return true
+	}
+	// Check for web identity (EKS/IRSA)
+	if jety.IsSet("AWS_WEB_IDENTITY_TOKEN_FILE") && jety.IsSet("AWS_ROLE_ARN") {
+		return true
+	}
+	return false
 }
 
 func defaultModelForProvider(p Provider) string {
