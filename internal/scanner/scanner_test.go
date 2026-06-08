@@ -101,3 +101,16 @@ func TestFindCrushDBs_Callbacks(t *testing.T) {
 		t.Errorf("expected 1 found path, got %d", len(foundPaths))
 	}
 }
+
+func TestFindCrushDBs_MissingRoot(t *testing.T) {
+	missingRoot := filepath.Join(t.TempDir(), "does-not-exist")
+
+	_, err := FindCrushDBs(missingRoot, nil)
+	if err == nil {
+		t.Fatal("expected error for missing root")
+	}
+
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected not-exist error, got %v", err)
+	}
+}
