@@ -40,6 +40,9 @@ func BuildPrompt(messages []db.UserMessage, targetDate time.Time) string {
 
 	for _, project := range projects {
 		msgs := projectMessages[project]
+		sort.SliceStable(msgs, func(i, j int) bool {
+			return msgs[i].Timestamp.Before(msgs[j].Timestamp)
+		})
 		fmt.Fprintf(&b, "## Project: %s\n\n", project)
 		for _, msg := range msgs {
 			fmt.Fprintf(&b, "[%s] %s\n\n", msg.Timestamp.Format("15:04"), TruncateText(msg.Text, 2000))

@@ -89,6 +89,41 @@ func TestBuildPrompt(t *testing.T) {
 	}
 }
 
+func TestBuildPrompt_SortsMessagesWithinProjectByTimestamp(t *testing.T) {
+	targetDate := time.Date(2026, 4, 29, 0, 0, 0, 0, time.Local)
+
+	messages := []db.UserMessage{
+		{
+			Timestamp: time.Date(2026, 4, 29, 15, 0, 0, 0, time.Local),
+			Text:      "ship the final fix",
+			Project:   "webapp",
+		},
+		{
+			Timestamp: time.Date(2026, 4, 29, 9, 0, 0, 0, time.Local),
+			Text:      "start investigating",
+			Project:   "webapp",
+		},
+		{
+			Timestamp: time.Date(2026, 4, 29, 12, 0, 0, 0, time.Local),
+			Text:      "narrow down the bug",
+			Project:   "webapp",
+		},
+	}
+
+	prompt := BuildPrompt(messages, targetDate)
+
+	first := strings.Index(prompt, "start investigating")
+	second := strings.Index(prompt, "narrow down the bug")
+	third := strings.Index(prompt, "ship the final fix")
+
+	if first == -1 || second == -1 || third == -1 {
+		t.Fatalf("prompt missing expected messages:\n%s", prompt)
+	}
+	if first > second || second > third {
+		t.Fatalf("messages rendered out of timestamp order:\n%s", prompt)
+	}
+}
+
 func TestBuildPrompt_Truncation(t *testing.T) {
 	targetDate := time.Date(2026, 4, 29, 0, 0, 0, 0, time.Local)
 
