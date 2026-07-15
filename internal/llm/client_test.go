@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -18,6 +19,8 @@ func TestParseProvider(t *testing.T) {
 		{"gpt", ProviderOpenAI, false},
 		{"openrouter", ProviderOpenRouter, false},
 		{"BEDROCK", ProviderBedrock, false},
+		{" openai ", ProviderOpenAI, false},
+		{"\tclaude\n", ProviderAnthropic, false},
 		{"unknown", "", true},
 	}
 
@@ -57,6 +60,9 @@ func TestDefaultModelForProvider(t *testing.T) {
 			got := defaultModelForProvider(tc.provider)
 			if got == "" {
 				t.Errorf("defaultModelForProvider(%q) returned empty string", tc.provider)
+			}
+			if !strings.Contains(got, tc.contains) {
+				t.Errorf("defaultModelForProvider(%q) = %q, want to contain %q", tc.provider, got, tc.contains)
 			}
 		})
 	}
