@@ -3,7 +3,9 @@ package scanner
 
 import (
 	_ "embed"
+	"errors"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -46,6 +48,9 @@ func FindCrushDBs(root string, opts *Options) ([]string, error) {
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
+			if path == root || errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) {
+				return err
+			}
 			return nil
 		}
 
