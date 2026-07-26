@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/fang"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/fang/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/spf13/cobra"
 	"github.com/taigrr/crunch/internal/db"
 	"github.com/taigrr/crunch/internal/llm"
@@ -234,7 +234,7 @@ func (m model) summarizeStreamCmd() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "ctrl+c" || msg.String() == "q" {
 			return m, tea.Quit
 		}
@@ -318,12 +318,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string {
+func (m model) View() tea.View {
 	if m.phase == phaseDone {
 		if m.err != nil {
-			return fmt.Sprintf("Error: %v\n", m.err)
+			return tea.NewView(fmt.Sprintf("Error: %v\n", m.err))
 		}
-		return m.summary + "\n"
+		return tea.NewView(m.summary + "\n")
 	}
 
 	var status string
@@ -365,7 +365,7 @@ func (m model) View() string {
 		}
 	}
 
-	return fmt.Sprintf("%s %s\n", m.spinner.View(), status)
+	return tea.NewView(fmt.Sprintf("%s %s\n", m.spinner.View(), status))
 }
 
 func run(cmd *cobra.Command, args []string) error {

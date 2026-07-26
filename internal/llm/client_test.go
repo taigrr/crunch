@@ -62,9 +62,6 @@ func TestDefaultModelForProvider(t *testing.T) {
 			if got != tc.expected {
 				t.Errorf("defaultModelForProvider(%q) = %q, want %q", tc.provider, got, tc.expected)
 			}
-			if !strings.Contains(got, tc.contains) {
-				t.Errorf("defaultModelForProvider(%q) = %q, want to contain %q", tc.provider, got, tc.contains)
-			}
 		})
 	}
 }

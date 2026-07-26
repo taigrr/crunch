@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/catwalk/pkg/catwalk"
-	"charm.land/fantasy"
-	"charm.land/fantasy/providers/anthropic"
-	"charm.land/fantasy/providers/bedrock"
-	"charm.land/fantasy/providers/openai"
-	"charm.land/fantasy/providers/openrouter"
+	"github.com/taigrr/catwalk/pkg/catwalk"
+	"github.com/taigrr/fantasy"
+	"github.com/taigrr/fantasy/providers/anthropic"
+	"github.com/taigrr/fantasy/providers/bedrock"
+	"github.com/taigrr/fantasy/providers/openai"
+	"github.com/taigrr/fantasy/providers/openrouter"
 	"github.com/taigrr/jety"
 )
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/taigrr/crunch/internal/db"
 	"github.com/taigrr/crunch/internal/llm"
 )
@@ -86,7 +86,7 @@ func TestViewDoneStates(t *testing.T) {
 		model.phase = phaseDone
 		model.summary = "daily summary"
 
-		view := model.View()
+		view := model.View().Content
 		if view != "daily summary\n" {
 			t.Fatalf("unexpected view: %q", view)
 		}
@@ -97,7 +97,7 @@ func TestViewDoneStates(t *testing.T) {
 		model.phase = phaseDone
 		model.err = errors.New("failed")
 
-		view := model.View()
+		view := model.View().Content
 		if !strings.Contains(view, "Error: failed") {
 			t.Fatalf("expected error in view, got %q", view)
 		}
@@ -109,13 +109,13 @@ func TestViewSummarizingIncludesProgress(t *testing.T) {
 	model.phase = phaseSummarizing
 	model.msgCount = 3
 
-	view := model.View()
+	view := model.View().Content
 	if !strings.Contains(view, "Generating summary") || !strings.Contains(view, "[3 messages]") {
 		t.Fatalf("expected summarizing message count, got %q", view)
 	}
 
 	model.streamChars = 120
-	view = model.View()
+	view = model.View().Content
 	if !strings.Contains(view, "Generating summary") || !strings.Contains(view, "[120 chars]") {
 		t.Fatalf("expected summarizing character count, got %q", view)
 	}
