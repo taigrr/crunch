@@ -392,7 +392,7 @@ func SupportedProviders() []string {
 
 // ParseProvider parses a provider string.
 func ParseProvider(s string) (Provider, error) {
-	switch strings.ToLower(s) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "bedrock", "aws":
 		return ProviderBedrock, nil
 	case "anthropic", "claude":
