@@ -8,7 +8,7 @@
 
 ## The Problem
 
-You use [Crush](https://github.com/charmcli/crush) all day, every day.
+You use [Crush](https://github.com/taigrr/crush) all day, every day.
 At the end of the week, you need to write status updates, fill out timesheets, or just remember what you worked on.
 But the context is scattered across dozens of project directories in `crush.db` files.
 
@@ -140,8 +140,8 @@ Perfect for:
 
 ## 🤝 Related Projects
 
-- [Crush](https://github.com/charmcli/crush) — The AI coding assistant that creates the databases
-- [Fantasy](https://github.com/charmbracelet/fantasy) — The multi-provider LLM library powering crunch
+- [Crush](https://github.com/taigrr/crush) — The AI coding assistant that creates the databases
+- [Fantasy](https://github.com/taigrr/fantasy) — The multi-provider LLM library powering crunch
 
 ## 📄 License
 
