@@ -116,6 +116,52 @@ func TestCollectMessages(t *testing.T) {
 	}
 }
 
+func TestCollectMessages_UsesTargetDateLocation(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	location := time.FixedZone("test-east", 2*60*60)
+	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, location)
+
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 1, 21, 59, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "previous local day"})},
+	})
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 1, 22, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "start of target local day"})},
+	})
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 21, 59, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "end of target local day"})},
+	})
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 22, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "next local day"})},
+	})
+
+	messages, err := CollectMessages([]string{dbPath}, targetDate, &CollectOptions{
+		BaseDir: tmpDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(messages) != 2 {
+		t.Fatalf("CollectMessages returned %d messages, want 2", len(messages))
+	}
+
+	gotTexts := []string{messages[0].Text, messages[1].Text}
+	wantTexts := []string{"start of target local day", "end of target local day"}
+	for i, want := range wantTexts {
+		if gotTexts[i] != want {
+			t.Fatalf("message %d text = %q, want %q", i, gotTexts[i], want)
+		}
+	}
+	for i, message := range messages {
+		if message.Timestamp.Location() != location {
+			t.Fatalf("message %d location = %v, want %v", i, message.Timestamp.Location(), location)
+		}
+	}
+}
+
 func TestCollectMessages_ReportsUnreadableDatabases(t *testing.T) {
 	missingDB := filepath.Join(t.TempDir(), "missing", ".crush", "crush.db")
 

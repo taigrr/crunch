@@ -47,7 +47,8 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 
 	var messages []UserMessage
 
-	startOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, time.Local)
+	location := targetDate.Location()
+	startOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, location)
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	startUnix := startOfDay.Unix()
@@ -59,7 +60,7 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 			opts.OnProgress(i+1, total)
 		}
 
-		msgs, err := extractFromDB(dbPath, startUnix, endUnix, opts.BaseDir)
+		msgs, err := extractFromDB(dbPath, startUnix, endUnix, opts.BaseDir, location)
 		if err != nil {
 			if opts.OnError != nil {
 				opts.OnError(dbPath, err)
@@ -72,7 +73,7 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 	return messages, nil
 }
 
-func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string) ([]UserMessage, error) {
+func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string, location *time.Location) ([]UserMessage, error) {
 	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
 	if err != nil {
 		return nil, err
@@ -124,7 +125,7 @@ func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string) ([]U
 		text := strings.TrimSpace(textContent.String())
 		if text != "" {
 			messages = append(messages, UserMessage{
-				Timestamp: time.Unix(createdAt, 0),
+				Timestamp: time.Unix(createdAt, 0).In(location),
 				Text:      text,
 				DBPath:    dbPath,
 				Project:   project,
