@@ -15,6 +15,7 @@ import (
 	"github.com/taigrr/crunch/internal/llm"
 	"github.com/taigrr/crunch/internal/scanner"
 	"github.com/taigrr/crunch/internal/summarizer"
+	"github.com/taigrr/crunch/internal/version"
 )
 
 var (
@@ -43,7 +44,7 @@ func main() {
 	cmd.Flags().StringVarP(&modelStr, "model", "m", "", "Model to use (provider-specific)")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key (or use env: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)")
 
-	if err := fang.Execute(context.Background(), cmd); err != nil {
+	if err := fang.Execute(context.Background(), cmd, fang.WithVersion(version.Version)); err != nil {
 		os.Exit(1)
 	}
 }

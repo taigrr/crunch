@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // MessagePart represents a part of a message with type and data.
@@ -49,7 +49,7 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 
 	location := targetDate.Location()
 	startOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, location)
-	endOfDay := startOfDay.Add(24 * time.Hour)
+	endOfDay := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day()+1, 0, 0, 0, 0, location)
 
 	startUnix := startOfDay.Unix()
 	endUnix := endOfDay.Unix()
@@ -74,7 +74,7 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 }
 
 func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string, location *time.Location) ([]UserMessage, error) {
-	db, err := sql.Open("sqlite3", dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
 	if err != nil {
 		return nil, err
 	}

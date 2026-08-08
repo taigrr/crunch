@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 func TestExtractProject(t *testing.T) {
@@ -162,6 +162,45 @@ func TestCollectMessages_UsesTargetDateLocation(t *testing.T) {
 	}
 }
 
+func TestCollectMessages_HandlesDSTDayBoundary(t *testing.T) {
+	location, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		t.Skipf("timezone data unavailable: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	// 2026-03-08 is a US spring-forward day (23h long): the window must end at
+	// the following local midnight, not startOfDay+24h.
+	targetDate := time.Date(2026, 3, 8, 0, 0, 0, 0, location)
+
+	insertMessage(t, dbPath, "user", time.Date(2026, 3, 8, 12, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "inside target day"})},
+	})
+	// 04:30 UTC on 2026-03-09 is 00:30 EDT (next local day). It falls before
+	// startOfDay+24h (05:00 UTC) but at/after the true next local midnight
+	// (04:00 UTC), so it must be excluded.
+	insertMessage(t, dbPath, "user", time.Date(2026, 3, 9, 4, 30, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "next local day"})},
+	})
+
+	messages, err := CollectMessages([]string{dbPath}, targetDate, &CollectOptions{
+		BaseDir: tmpDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(messages) != 1 {
+		t.Fatalf("CollectMessages returned %d messages, want 1", len(messages))
+	}
+	if messages[0].Text != "inside target day" {
+		t.Fatalf("message text = %q, want %q", messages[0].Text, "inside target day")
+	}
+}
+
 func TestCollectMessages_ReportsUnreadableDatabases(t *testing.T) {
 	missingDB := filepath.Join(t.TempDir(), "missing", ".crush", "crush.db")
 
@@ -193,7 +232,7 @@ func createTestDB(t *testing.T, dbPath string) {
 		t.Fatal(err)
 	}
 
-	database, err := sql.Open("sqlite3", dbPath)
+	database, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +253,7 @@ func createTestDB(t *testing.T, dbPath string) {
 func insertMessage(t *testing.T, dbPath, role string, createdAt time.Time, parts []MessagePart) {
 	t.Helper()
 
-	database, err := sql.Open("sqlite3", dbPath)
+	database, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}

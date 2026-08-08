@@ -6,6 +6,11 @@
 
 **Crunch your daily AI coding activity into a summary.**
 
+[![Test](https://github.com/taigrr/crunch/actions/workflows/test.yml/badge.svg)](https://github.com/taigrr/crunch/actions/workflows/test.yml)
+[![Lint](https://github.com/taigrr/crunch/actions/workflows/lint.yml/badge.svg)](https://github.com/taigrr/crunch/actions/workflows/lint.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/taigrr/crunch.svg)](https://pkg.go.dev/github.com/taigrr/crunch)
+[![License: 0BSD](https://img.shields.io/badge/License-0BSD-blue.svg)](LICENSE)
+
 ## The Problem
 
 You use [Crush](https://github.com/taigrr/crush) all day, every day.
