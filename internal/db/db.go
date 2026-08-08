@@ -4,6 +4,7 @@ package db
 import (
 	"database/sql"
 	"encoding/json"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,8 +74,28 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 	return messages, nil
 }
 
+// readOnlyDSN builds a modernc.org/sqlite DSN that opens dbPath read-only.
+// The read-only "mode=ro" flag is only honored when the DSN is a file: URI, so
+// the path is encoded as a proper file URL (with forward slashes and
+// percent-encoding) to stay correct on Windows and for paths containing URI
+// special characters such as spaces, '#', '?' or '%'.
+func readOnlyDSN(dbPath string) string {
+	p := filepath.ToSlash(dbPath)
+	if !strings.HasPrefix(p, "/") {
+		// Absolute Windows paths (C:/...) and any relative path need a
+		// leading slash to form a valid file URI (file:///C:/...).
+		p = "/" + p
+	}
+	u := url.URL{
+		Scheme:   "file",
+		Path:     p,
+		RawQuery: "mode=ro",
+	}
+	return u.String()
+}
+
 func extractFromDB(dbPath string, startUnix, endUnix int64, baseDir string, location *time.Location) ([]UserMessage, error) {
-	db, err := sql.Open("sqlite", "file:"+dbPath+"?mode=ro")
+	db, err := sql.Open("sqlite", readOnlyDSN(dbPath))
 	if err != nil {
 		return nil, err
 	}

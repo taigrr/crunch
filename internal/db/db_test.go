@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	_ "time/tzdata"
 
 	_ "modernc.org/sqlite"
 )
@@ -222,6 +223,76 @@ func TestCollectMessages_ReportsUnreadableDatabases(t *testing.T) {
 	}
 	if errorPath != missingDB {
 		t.Fatalf("OnError path = %q, want %q", errorPath, missingDB)
+	}
+}
+
+func TestReadOnlyDSN(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "unix absolute",
+			path: "/home/user/proj/.crush/crush.db",
+			want: "file:///home/user/proj/.crush/crush.db?mode=ro",
+		},
+		{
+			name: "path with space",
+			path: "/home/user/my proj/.crush/crush.db",
+			want: "file:///home/user/my%20proj/.crush/crush.db?mode=ro",
+		},
+		{
+			name: "path with hash and percent",
+			path: "/home/user/50%off#1/.crush/crush.db",
+			want: "file:///home/user/50%25off%231/.crush/crush.db?mode=ro",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := readOnlyDSN(tc.path); got != tc.want {
+				t.Fatalf("readOnlyDSN(%q) = %q, want %q", tc.path, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestReadOnlyDSN_OpensReadOnly(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	database, err := sql.Open("sqlite", readOnlyDSN(dbPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	if _, err := database.Exec("INSERT INTO messages (created_at, role, parts) VALUES (1, 'user', '[]')"); err == nil {
+		t.Fatal("expected write to fail on a read-only connection, got nil error")
+	}
+}
+
+func TestCollectMessages_HandlesSpecialCharPaths(t *testing.T) {
+	// A directory containing URI-special characters must still open, proving
+	// the DSN is properly encoded rather than concatenated.
+	dbPath := filepath.Join(t.TempDir(), "my proj #1", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "special path message"})},
+	})
+
+	messages, err := CollectMessages([]string{dbPath}, targetDate, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("CollectMessages returned %d messages, want 1", len(messages))
+	}
+	if messages[0].Text != "special path message" {
+		t.Fatalf("message text = %q, want %q", messages[0].Text, "special path message")
 	}
 }
 
