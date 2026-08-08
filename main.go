@@ -178,6 +178,11 @@ func (m model) collectCmd() tea.Cmd {
 			OnProgress: func(processed, total int) {
 				m.progressCh <- collectProgressMsg{processed: processed, total: total}
 			},
+			OnError: func(dbPath string, err error) {
+				if verbose {
+					fmt.Fprintf(os.Stderr, "Skipping %s: %v\n", dbPath, err)
+				}
+			},
 		}
 		messages, err := db.CollectMessages(m.dbFiles, m.targetDate, opts)
 		return collectDoneMsg{messages: messages, err: err}

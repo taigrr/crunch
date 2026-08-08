@@ -75,25 +75,40 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 }
 
 // readOnlyDSN builds a modernc.org/sqlite DSN that opens dbPath read-only.
-// The read-only "mode=ro" flag is only honored when the DSN is a file: URI, so
-// the path is resolved to an absolute path and encoded as a proper file URL
-// (with forward slashes and percent-encoding) to stay correct for relative
-// paths, Windows paths, and paths containing URI special characters such as
-// spaces, '#', '?' or '%'.
+// It resolves dbPath to an absolute path first so relative paths (e.g. from
+// "crunch -p somedir") remain anchored to the working directory rather than
+// the filesystem root.
 func readOnlyDSN(dbPath string) string {
 	if abs, err := filepath.Abs(dbPath); err == nil {
 		dbPath = abs
 	}
-	p := filepath.ToSlash(dbPath)
-	if !strings.HasPrefix(p, "/") {
-		// Absolute Windows paths (C:/...) need a leading slash to form a
-		// valid file URI (file:///C:/...).
-		p = "/" + p
-	}
-	u := url.URL{
-		Scheme:   "file",
-		Path:     p,
-		RawQuery: "mode=ro",
+	return fileURI(dbPath)
+}
+
+// fileURI encodes an absolute filesystem path as a read-only sqlite file: URI.
+// The read-only "mode=ro" flag is only honored when the DSN is a file: URI, so
+// the path is encoded as a proper file URL (forward slashes and
+// percent-encoding) to stay correct on Windows (drive and UNC paths) and for
+// paths containing URI special characters such as spaces, '#', '?' or '%'.
+func fileURI(absPath string) string {
+	p := filepath.ToSlash(absPath)
+	u := url.URL{Scheme: "file", RawQuery: "mode=ro"}
+	switch {
+	case strings.HasPrefix(p, "//"):
+		// Windows UNC path //server/share/... -> file://server/share/...
+		rest := strings.TrimPrefix(p, "//")
+		if i := strings.IndexByte(rest, '/'); i >= 0 {
+			u.Host = rest[:i]
+			u.Path = rest[i:]
+		} else {
+			u.Host = rest
+		}
+	case strings.HasPrefix(p, "/"):
+		u.Path = p
+	default:
+		// Absolute Windows drive path (C:/...) needs a leading slash to
+		// form a valid file URI (file:///C:/...).
+		u.Path = "/" + p
 	}
 	return u.String()
 }

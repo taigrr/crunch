@@ -226,7 +226,7 @@ func TestCollectMessages_ReportsUnreadableDatabases(t *testing.T) {
 	}
 }
 
-func TestReadOnlyDSN(t *testing.T) {
+func TestFileURI(t *testing.T) {
 	tests := []struct {
 		name string
 		path string
@@ -247,12 +247,26 @@ func TestReadOnlyDSN(t *testing.T) {
 			path: "/home/user/50%off#1/.crush/crush.db",
 			want: "file:///home/user/50%25off%231/.crush/crush.db?mode=ro",
 		},
+		{
+			name: "windows drive path",
+			path: "C:/Users/me/proj/.crush/crush.db",
+			want: "file:///C:/Users/me/proj/.crush/crush.db?mode=ro",
+		},
+		{
+			name: "windows unc path",
+			path: "//server/share/proj/.crush/crush.db",
+			want: "file://server/share/proj/.crush/crush.db?mode=ro",
+		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := readOnlyDSN(tc.path); got != tc.want {
-				t.Fatalf("readOnlyDSN(%q) = %q, want %q", tc.path, got, tc.want)
+			// fileURI receives an absolute path already normalized to
+			// forward slashes (as filepath.ToSlash would produce on the
+			// native OS); feeding that form keeps the test deterministic
+			// on any host.
+			if got := fileURI(tc.path); got != tc.want {
+				t.Fatalf("fileURI(%q) = %q, want %q", tc.path, got, tc.want)
 			}
 		})
 	}
@@ -270,6 +284,41 @@ func TestReadOnlyDSN_OpensReadOnly(t *testing.T) {
 
 	if _, err := database.Exec("INSERT INTO messages (created_at, role, parts) VALUES (1, 'user', '[]')"); err == nil {
 		t.Fatal("expected write to fail on a read-only connection, got nil error")
+	}
+}
+
+func TestCollectMessages_HandlesWALDatabase(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	// Real crush.db files run in WAL mode; enabling it here exercises the
+	// read-only open path against a WAL database (needs -wal/-shm access).
+	wdb, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wdb.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		t.Fatal(err)
+	}
+	if err := wdb.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "wal message"})},
+	})
+
+	messages, err := CollectMessages([]string{dbPath}, targetDate, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("CollectMessages returned %d messages, want 1", len(messages))
+	}
+	if messages[0].Text != "wal message" {
+		t.Fatalf("message text = %q, want %q", messages[0].Text, "wal message")
 	}
 }
 
