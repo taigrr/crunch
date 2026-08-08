@@ -255,7 +255,7 @@ func TestFileURI(t *testing.T) {
 		{
 			name: "windows unc path",
 			path: "//server/share/proj/.crush/crush.db",
-			want: "file://server/share/proj/.crush/crush.db?mode=ro",
+			want: "file:////server/share/proj/.crush/crush.db?mode=ro",
 		},
 	}
 
@@ -292,24 +292,38 @@ func TestCollectMessages_HandlesWALDatabase(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
 	createTestDB(t, dbPath)
 
-	// Real crush.db files run in WAL mode; enabling it here exercises the
-	// read-only open path against a WAL database (needs -wal/-shm access).
+	// Real crush.db files run in WAL mode and are often read while Crush is
+	// still running. Keep a writer connection open with autocheckpoint
+	// disabled so committed rows stay in -wal (and -shm persists) while we
+	// read read-only, exercising the read-only-with-live-WAL open path.
 	wdb, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
+	wdb.SetMaxOpenConns(1)
+	defer wdb.Close()
 	if _, err := wdb.Exec("PRAGMA journal_mode=WAL"); err != nil {
 		t.Fatal(err)
 	}
-	if err := wdb.Close(); err != nil {
+	if _, err := wdb.Exec("PRAGMA wal_autocheckpoint=0"); err != nil {
+		t.Fatal(err)
+	}
+
+	parts, err := json.Marshal([]MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "wal message"})},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wdb.Exec(
+		"INSERT INTO messages (created_at, role, parts) VALUES (?, 'user', ?)",
+		time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC).Unix(),
+		string(parts),
+	); err != nil {
 		t.Fatal(err)
 	}
 
 	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
-	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC), []MessagePart{
-		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "wal message"})},
-	})
-
 	messages, err := CollectMessages([]string{dbPath}, targetDate, nil)
 	if err != nil {
 		t.Fatal(err)

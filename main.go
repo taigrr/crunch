@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"time"
-	_ "time/tzdata" // embed zoneinfo so time.Local is DST-correct on minimal systems
+	_ "time/tzdata" // embed zoneinfo as a fallback so named zones resolve on systems without a system tzdata
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"

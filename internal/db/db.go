@@ -90,26 +90,20 @@ func readOnlyDSN(dbPath string) string {
 // the path is encoded as a proper file URL (forward slashes and
 // percent-encoding) to stay correct on Windows (drive and UNC paths) and for
 // paths containing URI special characters such as spaces, '#', '?' or '%'.
+//
+// The authority component is always left empty. Windows UNC paths
+// (//server/share/...) are kept in the path so they serialize to the
+// empty-authority form file:////server/share/...; modernc.org/sqlite is not
+// built with SQLITE_ALLOW_URI_AUTHORITY, so a non-empty authority would be
+// rejected.
 func fileURI(absPath string) string {
 	p := filepath.ToSlash(absPath)
-	u := url.URL{Scheme: "file", RawQuery: "mode=ro"}
-	switch {
-	case strings.HasPrefix(p, "//"):
-		// Windows UNC path //server/share/... -> file://server/share/...
-		rest := strings.TrimPrefix(p, "//")
-		if i := strings.IndexByte(rest, '/'); i >= 0 {
-			u.Host = rest[:i]
-			u.Path = rest[i:]
-		} else {
-			u.Host = rest
-		}
-	case strings.HasPrefix(p, "/"):
-		u.Path = p
-	default:
+	if !strings.HasPrefix(p, "/") {
 		// Absolute Windows drive path (C:/...) needs a leading slash to
 		// form a valid file URI (file:///C:/...).
-		u.Path = "/" + p
+		p = "/" + p
 	}
+	u := url.URL{Scheme: "file", Path: p, RawQuery: "mode=ro"}
 	return u.String()
 }
 
