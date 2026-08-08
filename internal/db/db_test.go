@@ -296,6 +296,31 @@ func TestCollectMessages_HandlesSpecialCharPaths(t *testing.T) {
 	}
 }
 
+func TestCollectMessages_HandlesRelativePaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "relative path message"})},
+	})
+
+	t.Chdir(tmpDir)
+	relPath := filepath.Join("repo", ".crush", "crush.db")
+
+	messages, err := CollectMessages([]string{relPath}, targetDate, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(messages) != 1 {
+		t.Fatalf("CollectMessages returned %d messages, want 1", len(messages))
+	}
+	if messages[0].Text != "relative path message" {
+		t.Fatalf("message text = %q, want %q", messages[0].Text, "relative path message")
+	}
+}
+
 func createTestDB(t *testing.T, dbPath string) {
 	t.Helper()
 

@@ -76,14 +76,18 @@ func CollectMessages(dbFiles []string, targetDate time.Time, opts *CollectOption
 
 // readOnlyDSN builds a modernc.org/sqlite DSN that opens dbPath read-only.
 // The read-only "mode=ro" flag is only honored when the DSN is a file: URI, so
-// the path is encoded as a proper file URL (with forward slashes and
-// percent-encoding) to stay correct on Windows and for paths containing URI
-// special characters such as spaces, '#', '?' or '%'.
+// the path is resolved to an absolute path and encoded as a proper file URL
+// (with forward slashes and percent-encoding) to stay correct for relative
+// paths, Windows paths, and paths containing URI special characters such as
+// spaces, '#', '?' or '%'.
 func readOnlyDSN(dbPath string) string {
+	if abs, err := filepath.Abs(dbPath); err == nil {
+		dbPath = abs
+	}
 	p := filepath.ToSlash(dbPath)
 	if !strings.HasPrefix(p, "/") {
-		// Absolute Windows paths (C:/...) and any relative path need a
-		// leading slash to form a valid file URI (file:///C:/...).
+		// Absolute Windows paths (C:/...) need a leading slash to form a
+		// valid file URI (file:///C:/...).
 		p = "/" + p
 	}
 	u := url.URL{
