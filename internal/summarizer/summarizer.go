@@ -68,6 +68,9 @@ func groupByProject(messages []db.UserMessage) map[string][]db.UserMessage {
 
 // TruncateText truncates text to maxLen runes, adding ellipsis if truncated.
 func TruncateText(text string, maxLen int) string {
+	if maxLen <= 0 {
+		return "..."
+	}
 	runes := []rune(text)
 	if len(runes) <= maxLen {
 		return text

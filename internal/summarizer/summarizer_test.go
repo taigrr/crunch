@@ -33,6 +33,18 @@ func TestTruncateText(t *testing.T) {
 			maxLen:   5,
 			expected: "hello...",
 		},
+		{
+			name:     "zero length returns ellipsis",
+			text:     "hello",
+			maxLen:   0,
+			expected: "...",
+		},
+		{
+			name:     "negative length returns ellipsis",
+			text:     "hello",
+			maxLen:   -1,
+			expected: "...",
+		},
 	}
 
 	for _, tc := range tests {
