@@ -45,6 +45,12 @@ func TestTruncateText(t *testing.T) {
 			maxLen:   -1,
 			expected: "...",
 		},
+		{
+			name:     "empty text with non-positive length returns empty",
+			text:     "",
+			maxLen:   0,
+			expected: "",
+		},
 	}
 
 	for _, tc := range tests {
