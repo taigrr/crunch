@@ -11,7 +11,7 @@ require (
 	github.com/taigrr/catwalk v0.51.3-fork
 	github.com/taigrr/fantasy v0.27.0-fork
 	github.com/taigrr/jety v0.4.2
-	modernc.org/sqlite v1.56.0
+	modernc.org/sqlite v1.57.0
 )
 
 require (
