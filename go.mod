@@ -8,7 +8,7 @@ require (
 	charm.land/fang/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/spf13/cobra v1.10.2
-	github.com/taigrr/catwalk v0.51.3-fork
+	github.com/taigrr/catwalk v0.51.4-fork
 	github.com/taigrr/fantasy v0.27.0-fork
 	github.com/taigrr/jety v0.4.2
 	modernc.org/sqlite v1.56.0
