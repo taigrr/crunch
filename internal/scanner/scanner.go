@@ -41,6 +41,9 @@ func FindCrushDBs(root string, opts *Options) ([]string, error) {
 	if opts == nil {
 		opts = &Options{}
 	}
+	if _, err := os.Stat(root); err != nil {
+		return nil, err
+	}
 	skipDirs := opts.SkipDirs
 	if skipDirs == nil {
 		skipDirs = DefaultSkipDirs
