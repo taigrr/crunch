@@ -116,6 +116,30 @@ func TestFindCrushDBs_MissingRoot(t *testing.T) {
 	}
 }
 
+func TestFindCrushDBs_MissingRootWithProjectsRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	missingRoot := filepath.Join(tmpDir, "does-not-exist")
+	dataDir := filepath.Join(tmpDir, "project-data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "crush.db"), []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[{"path":%q,"data_dir":%q}]}`, missingRoot, dataDir)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	_, err := FindCrushDBs(missingRoot, nil)
+	if err == nil {
+		t.Fatal("expected error for missing root")
+	}
+
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected not-exist error, got %v", err)
+	}
+}
+
 func TestFindCrushDBs_ProjectsRegistry(t *testing.T) {
 	tmpDir := t.TempDir()
 	globalData := filepath.Join(tmpDir, "global")
