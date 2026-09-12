@@ -3,15 +3,15 @@ module github.com/taigrr/crunch
 go 1.26.6
 
 require (
-	charm.land/bubbles/v2 v2.2.0
+	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.0.9
 	charm.land/fang/v2 v2.0.1
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/spf13/cobra v1.10.2
-	github.com/taigrr/catwalk v0.51.4-fork
+	github.com/taigrr/catwalk v0.51.6-fork
 	github.com/taigrr/fantasy v0.27.0-fork
 	github.com/taigrr/jety v0.4.3
-	modernc.org/sqlite v1.57.0
+	modernc.org/sqlite v1.58.0
 )
 
 require (
@@ -104,7 +104,7 @@ require (
 	google.golang.org/grpc v1.83.1 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.75.4 // indirect
+	modernc.org/libc v1.75.6 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
