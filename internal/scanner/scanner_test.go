@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -113,4 +114,141 @@ func TestFindCrushDBs_MissingRoot(t *testing.T) {
 	if !os.IsNotExist(err) {
 		t.Fatalf("expected not-exist error, got %v", err)
 	}
+}
+
+func TestFindCrushDBs_MissingRootWithProjectsRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	missingRoot := filepath.Join(tmpDir, "does-not-exist")
+	dataDir := filepath.Join(tmpDir, "project-data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "crush.db"), []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[{"path":%q,"data_dir":%q}]}`, missingRoot, dataDir)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	_, err := FindCrushDBs(missingRoot, nil)
+	if err == nil {
+		t.Fatal("expected error for missing root")
+	}
+
+	if !os.IsNotExist(err) {
+		t.Fatalf("expected not-exist error, got %v", err)
+	}
+}
+
+func TestFindCrushDBs_ProjectsRegistry(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	projectDir := filepath.Join(tmpDir, "project")
+	dataDir := filepath.Join(tmpDir, "outside-project-data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dataDir, "crush.db")
+	if err := os.WriteFile(dbPath, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[{"path":%q,"data_dir":%q}]}`, projectDir, dataDir)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	found, err := FindCrushDBs(tmpDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("expected 1 db, got %d", len(found))
+	}
+	if found[0] != dbPath {
+		t.Errorf("expected %s, got %s", dbPath, found[0])
+	}
+}
+
+func TestFindCrushDBs_ProjectsRegistryFiltersRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	searchRoot := filepath.Join(tmpDir, "search-root")
+	projectDir := filepath.Join(tmpDir, "other-project")
+	dataDir := filepath.Join(tmpDir, "other-data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(searchRoot, "local", ".crush"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	localDB := filepath.Join(searchRoot, "local", ".crush", "crush.db")
+	if err := os.WriteFile(localDB, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dataDir, "crush.db"), []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[{"path":%q,"data_dir":%q}]}`, projectDir, dataDir)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	found, err := FindCrushDBs(searchRoot, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("expected fallback walk to find 1 db, got %d", len(found))
+	}
+	if found[0] != localDB {
+		t.Errorf("expected %s, got %s", localDB, found[0])
+	}
+}
+
+func TestFindCrushDBs_ProjectsRegistryFallsBackWhenEmpty(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	projectDir := filepath.Join(tmpDir, "project", ".crush")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(projectDir, "crush.db")
+	if err := os.WriteFile(dbPath, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[]}`)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	found, err := FindCrushDBs(tmpDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("expected fallback walk to find 1 db, got %d", len(found))
+	}
+	if found[0] != dbPath {
+		t.Errorf("expected %s, got %s", dbPath, found[0])
+	}
+}
+
+func writeProjectsRegistry(t *testing.T, globalData, format string, args ...string) {
+	t.Helper()
+
+	if err := os.MkdirAll(globalData, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	content := []byte(format)
+	if len(args) > 0 {
+		content = []byte(formatRegistry(format, args...))
+	}
+	if err := os.WriteFile(filepath.Join(globalData, "projects.json"), content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func formatRegistry(format string, args ...string) string {
+	quoted := make([]any, len(args))
+	for i, arg := range args {
+		quoted[i] = arg
+	}
+	return fmt.Sprintf(format, quoted...)
 }

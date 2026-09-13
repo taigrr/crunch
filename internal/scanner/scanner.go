@@ -3,10 +3,12 @@ package scanner
 
 import (
 	_ "embed"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -34,16 +36,31 @@ type Options struct {
 	OnFound  func(path string)
 }
 
-// FindCrushDBs walks the directory tree from root and returns paths to all crush.db files found.
+// FindCrushDBs returns paths to crush.db files found under root.
 func FindCrushDBs(root string, opts *Options) ([]string, error) {
 	if opts == nil {
 		opts = &Options{}
+	}
+	if _, err := os.Stat(root); err != nil {
+		return nil, err
 	}
 	skipDirs := opts.SkipDirs
 	if skipDirs == nil {
 		skipDirs = DefaultSkipDirs
 	}
 
+	dbFiles, foundRegistry, err := findCrushDBsFromRegistry(root, opts)
+	if err != nil {
+		return nil, err
+	}
+	if foundRegistry {
+		return dbFiles, nil
+	}
+
+	return findCrushDBsByWalking(root, opts, skipDirs)
+}
+
+func findCrushDBsByWalking(root string, opts *Options, skipDirs map[string]bool) ([]string, error) {
 	var dbFiles []string
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
@@ -75,4 +92,116 @@ func FindCrushDBs(root string, opts *Options) ([]string, error) {
 	})
 
 	return dbFiles, err
+}
+
+type projectsRegistry struct {
+	Projects []projectEntry `json:"projects"`
+}
+
+type projectEntry struct {
+	Path    string `json:"path"`
+	DataDir string `json:"data_dir"`
+}
+
+func findCrushDBsFromRegistry(root string, opts *Options) ([]string, bool, error) {
+	registryPath, ok, err := projectsRegistryPath()
+	if err != nil {
+		return nil, false, err
+	}
+	if !ok {
+		return nil, false, nil
+	}
+
+	registry, err := readProjectsRegistry(registryPath)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var dbFiles []string
+	seen := map[string]bool{}
+	for _, project := range registry.Projects {
+		dbPath := filepath.Join(project.DataDir, "crush.db")
+		if project.DataDir == "" || !isProjectUnderRoot(project, rootAbs) || seen[dbPath] {
+			continue
+		}
+		if _, err := os.Stat(dbPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) {
+				continue
+			}
+			return nil, false, err
+		}
+		seen[dbPath] = true
+		dbFiles = append(dbFiles, dbPath)
+		if opts.OnFound != nil {
+			opts.OnFound(dbPath)
+		}
+	}
+
+	return dbFiles, len(dbFiles) > 0, nil
+}
+
+func projectsRegistryPath() (string, bool, error) {
+	if dir := os.Getenv("CRUSH_GLOBAL_DATA"); dir != "" {
+		return filepath.Join(dir, "projects.json"), true, nil
+	}
+
+	if runtime.GOOS == "windows" {
+		dir := os.Getenv("LOCALAPPDATA")
+		if dir == "" {
+			return "", false, nil
+		}
+		return filepath.Join(dir, "crush", "projects.json"), true, nil
+	}
+
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "crush", "projects.json"), true, nil
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", false, err
+	}
+	return filepath.Join(home, ".local", "share", "crush", "projects.json"), true, nil
+}
+
+func readProjectsRegistry(path string) (projectsRegistry, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return projectsRegistry{}, err
+	}
+	var registry projectsRegistry
+	if err := json.Unmarshal(content, &registry); err != nil {
+		return projectsRegistry{}, err
+	}
+	return registry, nil
+}
+
+func isProjectUnderRoot(project projectEntry, rootAbs string) bool {
+	if isPathUnderRoot(project.Path, rootAbs) || isPathUnderRoot(project.DataDir, rootAbs) {
+		return true
+	}
+	return false
+}
+
+func isPathUnderRoot(path, rootAbs string) bool {
+	if path == "" {
+		return false
+	}
+	pathAbs, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	rel, err := filepath.Rel(rootAbs, pathAbs)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)))
 }
