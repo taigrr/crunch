@@ -54,7 +54,7 @@ go build
 
 ## ⚡ Requirements
 
-- Go >= **1.26.5** (for installation)
+- Go >= **1.26.6** (for installation)
 - One of:
   - AWS credentials (for Bedrock)
   - `ANTHROPIC_API_KEY`
