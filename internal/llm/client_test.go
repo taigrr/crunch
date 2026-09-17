@@ -114,10 +114,116 @@ func TestCalculateCost(t *testing.T) {
 	}
 }
 
+func TestDetectProviderUsesRawProviderEnvVars(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      map[string]string
+		expected Provider
+	}{
+		{
+			name:     "anthropic",
+			env:      map[string]string{"ANTHROPIC_API_KEY": "ant-test"},
+			expected: ProviderAnthropic,
+		},
+		{
+			name:     "openai",
+			env:      map[string]string{"OPENAI_API_KEY": "openai-test"},
+			expected: ProviderOpenAI,
+		},
+		{
+			name:     "openrouter",
+			env:      map[string]string{"OPENROUTER_API_KEY": "openrouter-test"},
+			expected: ProviderOpenRouter,
+		},
+		{
+			name:     "aws access keys",
+			env:      map[string]string{"AWS_ACCESS_KEY_ID": "key", "AWS_SECRET_ACCESS_KEY": "secret"},
+			expected: ProviderBedrock,
+		},
+		{
+			name:     "aws profile",
+			env:      map[string]string{"AWS_PROFILE": "default"},
+			expected: ProviderBedrock,
+		},
+		{
+			name:     "aws sso",
+			env:      map[string]string{"AWS_SSO_SESSION": "session"},
+			expected: ProviderBedrock,
+		},
+		{
+			name:     "aws web identity",
+			env:      map[string]string{"AWS_WEB_IDENTITY_TOKEN_FILE": "/tmp/token", "AWS_ROLE_ARN": "arn"},
+			expected: ProviderBedrock,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			clearProviderEnv(t)
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+
+			got, err := detectProvider()
+			if err != nil {
+				t.Fatalf("detectProvider() unexpected error: %v", err)
+			}
+			if got != tc.expected {
+				t.Fatalf("detectProvider() = %q, want %q", got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestAPIKeyFromEnvUsesRawProviderEnvVars(t *testing.T) {
+	clearProviderEnv(t)
+	t.Setenv("ANTHROPIC_API_KEY", "ant-test")
+	t.Setenv("OPENAI_API_KEY", "openai-test")
+	t.Setenv("OPENROUTER_API_KEY", "openrouter-test")
+
+	tests := []struct {
+		provider Provider
+		expected string
+	}{
+		{ProviderAnthropic, "ant-test"},
+		{ProviderOpenAI, "openai-test"},
+		{ProviderOpenRouter, "openrouter-test"},
+		{ProviderBedrock, ""},
+	}
+
+	for _, tc := range tests {
+		t.Run(string(tc.provider), func(t *testing.T) {
+			got := apiKeyFromEnv(tc.provider)
+			if got != tc.expected {
+				t.Fatalf("apiKeyFromEnv(%q) = %q, want %q", tc.provider, got, tc.expected)
+			}
+		})
+	}
+}
+
 func TestSupportedProviders(t *testing.T) {
 	providers := SupportedProviders()
 	if len(providers) != 4 {
 		t.Errorf("SupportedProviders() returned %d providers, want 4", len(providers))
+	}
+}
+
+func clearProviderEnv(t *testing.T) {
+	t.Helper()
+
+	for _, key := range []string{
+		"CRUNCH_API_KEY",
+		"ANTHROPIC_API_KEY",
+		"OPENAI_API_KEY",
+		"OPENROUTER_API_KEY",
+		"AWS_ACCESS_KEY_ID",
+		"AWS_SECRET_ACCESS_KEY",
+		"AWS_PROFILE",
+		"AWS_SSO_SESSION",
+		"AWS_WEB_IDENTITY_TOKEN_FILE",
+		"AWS_ROLE_ARN",
+	} {
+		t.Setenv(key, "")
 	}
 }
 
