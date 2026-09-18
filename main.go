@@ -30,10 +30,17 @@ var (
 )
 
 func main() {
+	if err := fang.Execute(context.Background(), newRootCommand(), fang.WithVersion(version.Version)); err != nil {
+		os.Exit(1)
+	}
+}
+
+func newRootCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "crunch",
 		Short: "Summarize daily AI coding assistant activity",
 		Long:  "Scans for crush.db files and generates a summary of your daily coding activity.",
+		Args:  cobra.NoArgs,
 		RunE:  run,
 	}
 
@@ -45,9 +52,7 @@ func main() {
 	cmd.Flags().StringVarP(&modelStr, "model", "m", "", "Model to use (provider-specific)")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key (or use env: ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY)")
 
-	if err := fang.Execute(context.Background(), cmd, fang.WithVersion(version.Version)); err != nil {
-		os.Exit(1)
-	}
+	return cmd
 }
 
 type phase int
