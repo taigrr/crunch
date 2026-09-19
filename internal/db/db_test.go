@@ -51,6 +51,24 @@ func TestExtractProject(t *testing.T) {
 			baseDir:  "/home/testuser/work/",
 			expected: "project",
 		},
+		{
+			name:     "base dir exact match",
+			dbPath:   "/home/testuser/work/.crush/crush.db",
+			baseDir:  "/home/testuser/work",
+			expected: "work",
+		},
+		{
+			name:     "base dir sibling is not stripped",
+			dbPath:   "/home/testuser/workspace/project/.crush/crush.db",
+			baseDir:  "/home/testuser/work",
+			expected: "home/testuser/workspace",
+		},
+		{
+			name:     "base dir cleans dot segments",
+			dbPath:   "/home/testuser/work/project/.crush/crush.db",
+			baseDir:  "/home/testuser/work/./",
+			expected: "project",
+		},
 	}
 
 	for _, tc := range tests {
