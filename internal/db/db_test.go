@@ -51,6 +51,12 @@ func TestExtractProject(t *testing.T) {
 			baseDir:  "/home/testuser/work/",
 			expected: "project",
 		},
+		{
+			name:     "with cleaned custom base dir",
+			dbPath:   "/home/testuser/work/project/.crush/crush.db",
+			baseDir:  "/home/testuser/work/../work",
+			expected: "project",
+		},
 	}
 
 	for _, tc := range tests {
