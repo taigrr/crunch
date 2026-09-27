@@ -4,6 +4,7 @@ package llm
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/taigrr/catwalk/pkg/catwalk"
@@ -238,13 +239,13 @@ func detectProvider() (Provider, error) {
 		// If CRUNCH_API_KEY is set but no provider, default to anthropic
 		return ProviderAnthropic, nil
 	}
-	if jety.IsSet("ANTHROPIC_API_KEY") {
+	if envIsSet("ANTHROPIC_API_KEY") {
 		return ProviderAnthropic, nil
 	}
-	if jety.IsSet("OPENAI_API_KEY") {
+	if envIsSet("OPENAI_API_KEY") {
 		return ProviderOpenAI, nil
 	}
-	if jety.IsSet("OPENROUTER_API_KEY") {
+	if envIsSet("OPENROUTER_API_KEY") {
 		return ProviderOpenRouter, nil
 	}
 	// Check for AWS credentials before defaulting to Bedrock
@@ -257,22 +258,26 @@ func detectProvider() (Provider, error) {
 // hasAWSCredentials checks if AWS credentials are available via environment variables or profile.
 func hasAWSCredentials() bool {
 	// Check for explicit credentials
-	if jety.IsSet("AWS_ACCESS_KEY_ID") && jety.IsSet("AWS_SECRET_ACCESS_KEY") {
+	if envIsSet("AWS_ACCESS_KEY_ID") && envIsSet("AWS_SECRET_ACCESS_KEY") {
 		return true
 	}
 	// Check for profile-based credentials
-	if jety.IsSet("AWS_PROFILE") {
+	if envIsSet("AWS_PROFILE") {
 		return true
 	}
 	// Check for SSO session
-	if jety.IsSet("AWS_SSO_SESSION") {
+	if envIsSet("AWS_SSO_SESSION") {
 		return true
 	}
 	// Check for web identity (EKS/IRSA)
-	if jety.IsSet("AWS_WEB_IDENTITY_TOKEN_FILE") && jety.IsSet("AWS_ROLE_ARN") {
+	if envIsSet("AWS_WEB_IDENTITY_TOKEN_FILE") && envIsSet("AWS_ROLE_ARN") {
 		return true
 	}
 	return false
+}
+
+func envIsSet(key string) bool {
+	return os.Getenv(key) != ""
 }
 
 func defaultModelForProvider(p Provider) string {
@@ -293,11 +298,11 @@ func defaultModelForProvider(p Provider) string {
 func apiKeyFromEnv(p Provider) string {
 	switch p {
 	case ProviderAnthropic:
-		return jety.GetString("ANTHROPIC_API_KEY")
+		return os.Getenv("ANTHROPIC_API_KEY")
 	case ProviderOpenAI:
-		return jety.GetString("OPENAI_API_KEY")
+		return os.Getenv("OPENAI_API_KEY")
 	case ProviderOpenRouter:
-		return jety.GetString("OPENROUTER_API_KEY")
+		return os.Getenv("OPENROUTER_API_KEY")
 	default:
 		return ""
 	}
