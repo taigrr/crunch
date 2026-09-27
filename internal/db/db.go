@@ -181,19 +181,41 @@ func ExtractProject(dbPath string, baseDir string) string {
 func extractProjectWithHome(dbPath string, baseDir string, home string) string {
 	dir := filepath.Dir(dbPath)
 	dir = filepath.Dir(dir)
+	projectDir := dir
 
 	if baseDir != "" {
-		baseDir = strings.TrimSuffix(baseDir, "/")
-		dir = strings.TrimPrefix(dir, baseDir+"/")
+		if rel, ok := projectRelativePath(dir, baseDir); ok {
+			dir = rel
+		}
 	} else {
-		dir = strings.TrimPrefix(dir, home+"/")
-		dir = strings.TrimPrefix(dir, "code/")
+		if rel, ok := projectRelativePath(dir, home); ok {
+			dir = rel
+		}
+		if rel, ok := projectRelativePath(dir, "code"); ok {
+			dir = rel
+		}
 	}
 
-	parts := strings.Split(dir, "/")
+	if dir == "." {
+		dir = filepath.Base(filepath.Clean(projectDir))
+	}
+	dir = filepath.ToSlash(dir)
+	parts := strings.FieldsFunc(dir, func(r rune) bool {
+		return r == '/'
+	})
 	if len(parts) > 3 {
 		parts = parts[:3]
 	}
 
 	return strings.Join(parts, "/")
+}
+
+func projectRelativePath(path string, base string) (string, bool) {
+	cleanPath := filepath.Clean(path)
+	cleanBase := filepath.Clean(base)
+	rel, err := filepath.Rel(cleanBase, cleanPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return rel, true
 }
