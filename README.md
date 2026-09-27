@@ -19,7 +19,7 @@ But the context is scattered across dozens of project directories in `crush.db` 
 
 ## The Solution
 
-**Crunch** scans your filesystem for `crush.db` files, extracts your prompts for a given date, and generates a structured summary using your preferred LLM.
+**Crunch** discovers `crush.db` files from Crush's project registry when available, falls back to filesystem scanning, extracts your prompts for a given date, and generates a structured summary using your preferred LLM.
 
 ```bash
 # What did I work on today?
@@ -31,7 +31,7 @@ crunch -d 2026-04-22
 
 ## ✨ Features
 
-- 🔍 **Automatic discovery** — Recursively finds all `crush.db` files
+- 🔍 **Automatic discovery** — Uses Crush's project registry when available, with recursive scanning as a fallback
 - 📅 **Date filtering** — Summarize any day's activity
 - 🏷️ **Project grouping** — Messages organized by inferred project
 - 🌊 **Streaming output** — Real-time progress with cost estimation
@@ -54,7 +54,7 @@ go build
 
 ## ⚡ Requirements
 
-- Go >= **1.26.5** (for installation)
+- Go >= **1.26.6** (for installation)
 - One of:
   - AWS credentials (for Bedrock)
   - `ANTHROPIC_API_KEY`
@@ -120,7 +120,7 @@ export CRUNCH_API_KEY="sk-ant-..."
 
 ## 🔧 How It Works
 
-1. **Scan** — Walks your filesystem looking for `crush.db` files
+1. **Discover** — Uses Crush's project registry when available, or walks your filesystem looking for `crush.db` files
 2. **Skip** — Ignores common dependency directories (node_modules, vendor, .git, etc.)
 3. **Extract** — Reads user messages from SQLite for the target date
 4. **Group** — Organizes messages by project (inferred from file path)
