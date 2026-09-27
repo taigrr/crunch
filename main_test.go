@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,21 @@ func TestInitialModel(t *testing.T) {
 	}
 	if model.progressCh == nil {
 		t.Fatal("expected progress channel to be initialized")
+	}
+}
+
+func TestRootCommandRejectsExtraArgs(t *testing.T) {
+	cmd := newRootCommand()
+	cmd.SetArgs([]string{"unexpected"})
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("expected extra positional arg to fail validation")
+	}
+	if !strings.Contains(err.Error(), `unknown command "unexpected"`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
