@@ -24,6 +24,14 @@ jobs:
       - name: Download modules
         run: go mod download
 
+      - name: Check generated files
+        run: |
+          go generate ./...
+          if ! git diff --exit-code; then
+            echo "Generated files are out of date; run 'go generate ./...'"
+            exit 1
+          fi
+
       - name: Build
         run: go build ./...
 
