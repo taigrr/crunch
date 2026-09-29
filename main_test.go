@@ -121,6 +121,70 @@ func TestViewSummarizingIncludesProgress(t *testing.T) {
 	}
 }
 
+func TestUpdateTracksScanAndCollectionProgress(t *testing.T) {
+	model := initialModel(time.Now(), "")
+
+	updated, cmd := updateModel(t, model, scanProgressMsg{count: 2})
+	if updated.scanCount != 2 {
+		t.Fatalf("expected scan count 2, got %d", updated.scanCount)
+	}
+	if cmd == nil {
+		t.Fatal("expected progress listener command")
+	}
+
+	updated, cmd = updateModel(t, updated, scanDoneMsg{dbFiles: []string{"one.db", "two.db"}})
+	if updated.phase != phaseCollecting {
+		t.Fatalf("expected phaseCollecting, got %v", updated.phase)
+	}
+	if updated.dbTotal != 2 {
+		t.Fatalf("expected db total 2, got %d", updated.dbTotal)
+	}
+	if cmd == nil {
+		t.Fatal("expected collection command")
+	}
+
+	updated, cmd = updateModel(t, updated, collectProgressMsg{processed: 1, total: 2})
+	if updated.dbProcessed != 1 || updated.dbTotal != 2 {
+		t.Fatalf("expected collection progress 1/2, got %d/%d", updated.dbProcessed, updated.dbTotal)
+	}
+	if cmd == nil {
+		t.Fatal("expected progress listener command")
+	}
+}
+
+func TestUpdateStreamFinishUsesActualUsageInView(t *testing.T) {
+	model := initialModel(time.Now(), "")
+	model.phase = phaseSummarizing
+	model.streamChars = 120
+
+	updated, cmd := updateModel(t, model, streamFinishMsg{
+		usage: llm.Usage{
+			InputTokens:  100,
+			OutputTokens: 50,
+			TotalTokens:  150,
+			Cost:         0.0042,
+		},
+	})
+
+	if updated.inputTokens != 100 {
+		t.Fatalf("expected input tokens 100, got %d", updated.inputTokens)
+	}
+	if updated.outputTokens != 50 {
+		t.Fatalf("expected output tokens 50, got %d", updated.outputTokens)
+	}
+	if updated.finalCost != 0.0042 {
+		t.Fatalf("expected final cost 0.0042, got %f", updated.finalCost)
+	}
+	if cmd == nil {
+		t.Fatal("expected progress listener command")
+	}
+
+	view := updated.View().Content
+	if !strings.Contains(view, "~$0.0042") {
+		t.Fatalf("expected actual cost in view, got %q", view)
+	}
+}
+
 func updateModel(t *testing.T, currentModel model, msg tea.Msg) (model, tea.Cmd) {
 	t.Helper()
 
