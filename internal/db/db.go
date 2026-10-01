@@ -183,17 +183,32 @@ func extractProjectWithHome(dbPath string, baseDir string, home string) string {
 	dir = filepath.Dir(dir)
 
 	if baseDir != "" {
-		baseDir = strings.TrimSuffix(baseDir, "/")
-		dir = strings.TrimPrefix(dir, baseDir+"/")
+		if rel := relativePathIfInside(dir, baseDir); rel != dir {
+			dir = rel
+		} else {
+			dir = relativePathIfInside(dir, home)
+		}
 	} else {
-		dir = strings.TrimPrefix(dir, home+"/")
-		dir = strings.TrimPrefix(dir, "code/")
+		dir = relativePathIfInside(dir, home)
+		dir = relativePathIfInside(dir, "code")
 	}
 
-	parts := strings.Split(dir, "/")
+	parts := strings.Split(filepath.ToSlash(dir), "/")
 	if len(parts) > 3 {
 		parts = parts[:3]
 	}
 
 	return strings.Join(parts, "/")
+}
+
+func relativePathIfInside(path, base string) string {
+	if base == "" {
+		return path
+	}
+
+	rel, err := filepath.Rel(filepath.Clean(base), filepath.Clean(path))
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+		return path
+	}
+	return rel
 }
