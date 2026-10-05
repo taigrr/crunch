@@ -226,6 +226,40 @@ func TestCollectMessages_ReportsUnreadableDatabases(t *testing.T) {
 	}
 }
 
+func TestCollectMessages_SkipsInvalidAndNonTextParts(t *testing.T) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "repo", ".crush", "crush.db")
+	createTestDB(t, dbPath)
+
+	targetDate := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 9, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "tool_use", Data: json.RawMessage(`{"name":"build"}`)},
+	})
+	insertRawParts(t, dbPath, "user", time.Date(2026, 7, 2, 10, 0, 0, 0, time.UTC), `not json`)
+	insertRawParts(t, dbPath, "user", time.Date(2026, 7, 2, 11, 0, 0, 0, time.UTC), `[{"type":"text","data":{"text":123}}]`)
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 12, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "   \n\t  "})},
+	})
+	insertMessage(t, dbPath, "user", time.Date(2026, 7, 2, 13, 0, 0, 0, time.UTC), []MessagePart{
+		{Type: "tool_use", Data: json.RawMessage(`{"name":"test"}`)},
+		{Type: "text", Data: mustMarshalRaw(t, TextData{Text: "keep the useful text"})},
+	})
+
+	messages, err := CollectMessages([]string{dbPath}, targetDate, &CollectOptions{
+		BaseDir: tmpDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(messages) != 1 {
+		t.Fatalf("CollectMessages returned %d messages, want 1", len(messages))
+	}
+	if messages[0].Text != "keep the useful text" {
+		t.Fatalf("message text = %q, want %q", messages[0].Text, "keep the useful text")
+	}
+}
+
 func TestFileURI(t *testing.T) {
 	tests := []struct {
 		name string
@@ -428,6 +462,26 @@ func insertMessage(t *testing.T, dbPath, role string, createdAt time.Time, parts
 		createdAt.Unix(),
 		role,
 		string(partsJSON),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertRawParts(t *testing.T, dbPath, role string, createdAt time.Time, parts string) {
+	t.Helper()
+
+	database, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer database.Close()
+
+	_, err = database.Exec(
+		"INSERT INTO messages (created_at, role, parts) VALUES (?, ?, ?)",
+		createdAt.Unix(),
+		role,
+		parts,
 	)
 	if err != nil {
 		t.Fatal(err)
