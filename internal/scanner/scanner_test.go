@@ -230,6 +230,33 @@ func TestFindCrushDBs_ProjectsRegistryFallsBackWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestFindCrushDBs_ProjectsRegistryFallsBackWhenMalformed(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	projectDir := filepath.Join(tmpDir, "project", ".crush")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(projectDir, "crush.db")
+	if err := os.WriteFile(dbPath, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[`)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	found, err := FindCrushDBs(tmpDir, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("expected fallback walk to find 1 db, got %d", len(found))
+	}
+	if found[0] != dbPath {
+		t.Errorf("expected %s, got %s", dbPath, found[0])
+	}
+}
+
 func writeProjectsRegistry(t *testing.T, globalData, format string, args ...string) {
 	t.Helper()
 

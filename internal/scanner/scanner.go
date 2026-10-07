@@ -114,7 +114,7 @@ func findCrushDBsFromRegistry(root string, opts *Options) ([]string, bool, error
 
 	registry, err := readProjectsRegistry(registryPath)
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) || errors.Is(err, os.ErrNotExist) || isRegistryFormatError(err) {
 			return nil, false, nil
 		}
 		return nil, false, err
@@ -182,6 +182,12 @@ func readProjectsRegistry(path string) (projectsRegistry, error) {
 		return projectsRegistry{}, err
 	}
 	return registry, nil
+}
+
+func isRegistryFormatError(err error) bool {
+	var syntaxErr *json.SyntaxError
+	var typeErr *json.UnmarshalTypeError
+	return errors.As(err, &syntaxErr) || errors.As(err, &typeErr)
 }
 
 func isProjectUnderRoot(project projectEntry, rootAbs string) bool {
