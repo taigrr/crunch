@@ -168,6 +168,44 @@ func TestFindCrushDBs_ProjectsRegistry(t *testing.T) {
 	}
 }
 
+func TestFindCrushDBs_ProjectsRegistryDeduplicatesDataDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	globalData := filepath.Join(tmpDir, "global")
+	projectDir := filepath.Join(tmpDir, "project")
+	dataDir := filepath.Join(tmpDir, "project-data")
+	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dbPath := filepath.Join(dataDir, "crush.db")
+	if err := os.WriteFile(dbPath, []byte("test"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeProjectsRegistry(t, globalData, `{"projects":[{"path":%q,"data_dir":%q},{"path":%q,"data_dir":%q}]}`, projectDir, dataDir, projectDir, dataDir)
+	t.Setenv("CRUSH_GLOBAL_DATA", globalData)
+
+	var foundPaths []string
+	opts := &Options{
+		OnFound: func(path string) { foundPaths = append(foundPaths, path) },
+	}
+	found, err := FindCrushDBs(tmpDir, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(found) != 1 {
+		t.Fatalf("expected 1 db, got %d", len(found))
+	}
+	if found[0] != dbPath {
+		t.Errorf("expected %s, got %s", dbPath, found[0])
+	}
+	if len(foundPaths) != 1 {
+		t.Fatalf("expected OnFound once, got %d", len(foundPaths))
+	}
+	if foundPaths[0] != dbPath {
+		t.Errorf("expected callback for %s, got %s", dbPath, foundPaths[0])
+	}
+}
+
 func TestFindCrushDBs_ProjectsRegistryFiltersRoot(t *testing.T) {
 	tmpDir := t.TempDir()
 	globalData := filepath.Join(tmpDir, "global")
