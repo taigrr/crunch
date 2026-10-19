@@ -120,12 +120,20 @@ export CRUNCH_API_KEY="sk-ant-..."
 
 ## 🔧 How It Works
 
-1. **Scan** — Walks your filesystem looking for `crush.db` files
-2. **Skip** — Ignores common dependency directories (node_modules, vendor, .git, etc.)
+1. **Discover** — Reads Crush's `projects.json` and taigrr/crush's `workspaces.jsonl` registries, falling back to a filesystem scan when no matching databases are found
+2. **Skip** — During filesystem scanning, ignores common dependency directories (node_modules, vendor, .git, etc.)
 3. **Extract** — Reads user messages from SQLite for the target date
 4. **Group** — Organizes messages by project (inferred from file path)
 5. **Summarize** — Sends grouped prompts to your LLM with streaming output
 6. **Display** — Shows real-time progress with token/cost estimation
+
+Registries live in `$CRUSH_GLOBAL_DATA` when set, otherwise
+`$XDG_DATA_HOME/crush` or `~/.local/share/crush` (Windows:
+`%LOCALAPPDATA%/crush`, falling back to `%USERPROFILE%/AppData/Local/crush`).
+They index project data directories; sessions remain in each directory's
+`crush.db`. Both registries are combined, with workspace entries taking precedence
+for the same project root and the last JSONL record winning for each workspace.
+Missing or malformed records and stale database paths are ignored.
 
 ## 📋 Output
 
