@@ -51,11 +51,7 @@ func BuildPrompt(messages []db.UserMessage, targetDate time.Time) string {
 
 	prompt := b.String()
 
-	if len(prompt) > MaxPromptChars {
-		prompt = prompt[:MaxPromptChars] + "\n\n[...truncated due to length...]"
-	}
-
-	return prompt
+	return TruncatePrompt(prompt, MaxPromptChars)
 }
 
 func groupByProject(messages []db.UserMessage) map[string][]db.UserMessage {
@@ -79,4 +75,22 @@ func TruncateText(text string, maxLen int) string {
 		return text
 	}
 	return string(runes[:maxLen]) + "..."
+}
+
+// TruncatePrompt truncates prompt text by rune count so multi-byte characters
+// are not split at the byte boundary.
+func TruncatePrompt(prompt string, maxLen int) string {
+	if maxLen <= 0 {
+		if prompt == "" {
+			return ""
+		}
+		return "\n\n[...truncated due to length...]"
+	}
+
+	runes := []rune(prompt)
+	if len(runes) <= maxLen {
+		return prompt
+	}
+
+	return string(runes[:maxLen]) + "\n\n[...truncated due to length...]"
 }

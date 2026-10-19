@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/taigrr/crunch/internal/db"
 )
@@ -163,5 +164,69 @@ func TestBuildPrompt_Truncation(t *testing.T) {
 
 	if !strings.Contains(prompt, "[...truncated due to length...]") {
 		t.Error("truncated prompt should contain truncation notice")
+	}
+}
+
+func TestBuildPrompt_TruncationPreservesUTF8(t *testing.T) {
+	targetDate := time.Date(2026, 4, 29, 0, 0, 0, 0, time.Local)
+	var messages []db.UserMessage
+	for range 1000 {
+		messages = append(messages, db.UserMessage{
+			Timestamp: targetDate.Add(9 * time.Hour),
+			Text:      strings.Repeat("界", 2000),
+			Project:   "unicode",
+		})
+	}
+
+	prompt := BuildPrompt(messages, targetDate)
+
+	if !utf8.ValidString(prompt) {
+		t.Fatal("truncated prompt is not valid UTF-8")
+	}
+	if !strings.Contains(prompt, "[...truncated due to length...]") {
+		t.Fatal("truncated prompt should contain truncation notice")
+	}
+}
+
+func TestTruncatePrompt(t *testing.T) {
+	tests := []struct {
+		name     string
+		prompt   string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "short prompt unchanged",
+			prompt:   "hello",
+			maxLen:   10,
+			expected: "hello",
+		},
+		{
+			name:     "unicode truncated by rune",
+			prompt:   "界界界",
+			maxLen:   2,
+			expected: "界界\n\n[...truncated due to length...]",
+		},
+		{
+			name:     "empty prompt with non-positive length returns empty",
+			prompt:   "",
+			maxLen:   0,
+			expected: "",
+		},
+		{
+			name:     "non-empty prompt with non-positive length returns notice",
+			prompt:   "hello",
+			maxLen:   0,
+			expected: "\n\n[...truncated due to length...]",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := TruncatePrompt(tc.prompt, tc.maxLen)
+			if got != tc.expected {
+				t.Fatalf("TruncatePrompt(%q, %d) = %q, want %q", tc.prompt, tc.maxLen, got, tc.expected)
+			}
+		})
 	}
 }
