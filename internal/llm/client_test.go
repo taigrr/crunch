@@ -5,6 +5,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/taigrr/jety"
 )
 
 func TestParseProvider(t *testing.T) {
@@ -331,5 +333,7 @@ func resetCredentialEnv(t *testing.T) {
 			}
 			_ = os.Setenv(key, *value)
 		}
+		jety.SetEnvPrefix(envPrefix)
 	})
+	jety.SetEnvPrefix(envPrefix)
 }

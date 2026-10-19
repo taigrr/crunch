@@ -19,10 +19,12 @@ import (
 const (
 	// DefaultMaxTokens is the default max output tokens.
 	DefaultMaxTokens = 8192
+
+	envPrefix = "CRUNCH_"
 )
 
 func init() {
-	jety.SetEnvPrefix("CRUNCH_")
+	jety.SetEnvPrefix(envPrefix)
 	jety.SetDefault("provider", "")
 	jety.SetDefault("model", "")
 	jety.SetDefault("api_key", "")
