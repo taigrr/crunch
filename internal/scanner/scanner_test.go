@@ -66,6 +66,30 @@ func TestFindCrushDBs_CustomSkipDirs(t *testing.T) {
 	}
 }
 
+func TestParseSkipDirs(t *testing.T) {
+	got := parseSkipDirs(`
+
+		# language caches
+		node_modules
+		vendor
+
+		# editor state
+		.zed
+	`)
+
+	for _, dir := range []string{"node_modules", "vendor", ".zed"} {
+		if !got[dir] {
+			t.Errorf("expected %q to be parsed as skip dir", dir)
+		}
+	}
+
+	for _, dir := range []string{"", "# language caches", "# editor state"} {
+		if got[dir] {
+			t.Errorf("did not expect %q to be parsed as skip dir", dir)
+		}
+	}
+}
+
 func TestFindCrushDBs_Callbacks(t *testing.T) {
 	tmpDir := t.TempDir()
 

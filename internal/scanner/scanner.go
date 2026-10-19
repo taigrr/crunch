@@ -20,7 +20,7 @@ func parseSkipDirs(content string) map[string]bool {
 	dirs := make(map[string]bool)
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimSpace(line)
-		if line != "" {
+		if line != "" && !strings.HasPrefix(line, "#") {
 			dirs[line] = true
 		}
 	}
