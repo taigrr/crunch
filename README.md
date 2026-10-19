@@ -102,7 +102,7 @@ crunch --provider openrouter -m anthropic/claude-sonnet-4
 | `openai`     | `OPENAI_API_KEY`     | `gpt-4o`                                     |
 | `openrouter` | `OPENROUTER_API_KEY` | `anthropic/claude-sonnet-4`                  |
 
-Provider is auto-detected from environment variables. If multiple are set, priority is: Anthropic > OpenAI > OpenRouter > Bedrock.
+Provider is auto-detected from environment variables. If `CRUNCH_API_KEY` is set without `CRUNCH_PROVIDER`, Crunch defaults to Anthropic. If multiple provider-specific credentials are set, priority is: Anthropic > OpenAI > OpenRouter > Bedrock.
 
 ## ⚙️ Environment Variables
 
