@@ -34,10 +34,16 @@ type Options struct {
 	OnFound  func(path string)
 }
 
-// FindCrushDBs walks the directory tree from root and returns paths to all crush.db files found.
+// FindCrushDBs discovers crush.db files through Crush registries, falling back to walking root.
 func FindCrushDBs(root string, opts *Options) ([]string, error) {
 	if opts == nil {
 		opts = &Options{}
+	}
+	if _, err := os.Stat(root); err != nil {
+		return nil, err
+	}
+	if dbFiles, err := findRegistryDBs(root, opts); err != nil || len(dbFiles) > 0 {
+		return dbFiles, err
 	}
 	skipDirs := opts.SkipDirs
 	if skipDirs == nil {
