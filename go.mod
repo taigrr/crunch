@@ -13,7 +13,7 @@ require (
 	github.com/taigrr/catwalk v0.53.0-fork
 	github.com/taigrr/fantasy v0.31.0-fork
 	github.com/taigrr/jety v0.4.3
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.61.1
 )
 
 require (
