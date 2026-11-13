@@ -1,8 +1,6 @@
 module github.com/taigrr/crunch
 
-go 1.27.2
-
-toolchain go1.27.3
+go 1.27.4
 
 require (
 	charm.land/bubbles/v2 v2.2.1
