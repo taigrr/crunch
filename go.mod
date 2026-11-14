@@ -8,12 +8,12 @@ require (
 	charm.land/bubbles/v2 v2.2.1
 	charm.land/bubbletea/v2 v2.1.1
 	charm.land/fang/v2 v2.0.1
-	charm.land/lipgloss/v2 v2.0.6
+	charm.land/lipgloss/v2 v2.1.0
 	github.com/spf13/cobra v1.10.2
-	github.com/taigrr/catwalk v0.53.0-fork
-	github.com/taigrr/fantasy v0.31.0-fork
+	github.com/taigrr/catwalk v0.54.0-fork
+	github.com/taigrr/fantasy v0.31.1-fork
 	github.com/taigrr/jety v0.4.3
-	modernc.org/sqlite v1.61.0
+	modernc.org/sqlite v1.62.0
 )
 
 require (
@@ -114,7 +114,7 @@ require (
 	google.golang.org/grpc v1.86.0-dev // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	modernc.org/libc v1.79.0 // indirect
+	modernc.org/libc v1.80.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
